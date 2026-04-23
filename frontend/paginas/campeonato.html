@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detalhes do Campeonato</title>
+  <link rel="stylesheet" href="../css/estilo.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="cabecalho">
+      <h1>Detalhes do Campeonato</h1>
+      <p>Acompanhe inscrições, jogos e pódio.</p>
+      <a href="./inicio.html" class="link-voltar">← Voltar para início</a>
+    </header>
+
+    <section class="card">
+      <div class="titulo-secao">
+        <h2>Resumo do campeonato</h2>
+        <div class="acoes-topo">
+          <button id="botao-copiar-link" class="botao botao-copiar">Copiar link da inscrição</button>
+          <button id="botao-encerrar" class="botao secundario">Encerrar inscrições</button>
+          <button id="botao-chaveamento" class="botao">Gerar chaveamento</button>
+          <button id="botao-excluir-campeonato" class="botao botao-excluir-campeonato">Excluir campeonato</button>
+        </div>
+      </div>
+
+      <p id="mensagem-campeonato" class="mensagem"></p>
+      <div id="dados-campeonato"></div>
+    </section>
+
+    <section class="card">
+      <h2>Participantes</h2>
+      <div id="lista-participantes">
+        <p>Carregando participantes...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Jogos</h2>
+      <div id="lista-jogos">
+        <p>Carregando jogos...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pódio</h2>
+      <div id="podio">
+        <p>Pódio ainda não definido.</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/campeonato.js"></script>
+</body>
+</html>

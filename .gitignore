@@ -1,0 +1,35 @@
+# Dependências
+node_modules/
+
+# Variáveis de ambiente
+.env
+backend/.env
+frontend/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Pasta de build / saída
+dist/
+build/
+
+# Cobertura de testes
+coverage/
+
+# Arquivos temporários do editor
+.vscode/
+.idea/
+
+# Prisma local gerado, se existir fora do padrão
+generated/
+
+# Arquivos temporários
+*.tmp
+*.temp

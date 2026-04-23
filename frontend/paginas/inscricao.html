@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inscrição no Campeonato</title>
+  <link rel="stylesheet" href="../css/estilo.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="cabecalho">
+      <h1>Inscrição no Campeonato</h1>
+      <p>Cadastre sua dupla ou time.</p>
+      <a href="./inicio.html" class="link-voltar">← Voltar para início</a>
+    </header>
+
+    <section class="card">
+      <h2>Informações do campeonato</h2>
+      <div id="dados-campeonato-publico">
+        <p>Carregando informações...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Formulário de inscrição</h2>
+      <form id="form-inscricao" class="formulario">
+        <div class="grupo-formulario">
+          <label for="nomeEquipe">Nome da dupla/time</label>
+          <input type="text" id="nomeEquipe" name="nomeEquipe" required />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="responsavel">Responsável</label>
+          <input type="text" id="responsavel" name="responsavel" required />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="contato">Contato</label>
+          <input type="text" id="contato" name="contato" />
+        </div>
+
+        <div id="jogadores-container" class="bloco-jogadores"></div>
+
+        <button type="submit" class="botao">Enviar inscrição</button>
+      </form>
+
+      <p id="mensagem-inscricao" class="mensagem"></p>
+    </section>
+  </main>
+
+  <script type="module" src="../js/inscricao.js"></script>
+</body>
+</html>
