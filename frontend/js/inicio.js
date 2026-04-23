@@ -1,8 +1,9 @@
 import {
-  listarCampeonatos,
+  listarMeusCampeonatos,
   criarCampeonato,
   excluirCampeonato,
-  buscarResumoCampeonato
+  buscarResumoCampeonato,
+  obterToken
 } from "./api.js";
 
 const formCampeonato = document.getElementById("form-campeonato");
@@ -11,12 +12,51 @@ const listaCampeonatos = document.getElementById("lista-campeonatos");
 const botaoAtualizar = document.getElementById("botao-atualizar");
 const buscaCampeonato = document.getElementById("busca-campeonato");
 const filtroStatus = document.getElementById("filtro-status");
+const usuarioLogadoBox = document.getElementById("usuario-logado-box");
+const botaoLogout = document.getElementById("botao-logout");
+const linkLogin = document.getElementById("link-login");
 
 let campeonatosComResumo = [];
 
+function obterOrganizadorLogado() {
+  const dados = localStorage.getItem("organizadorLogado");
+  return dados ? JSON.parse(dados) : null;
+}
+
+function estaAutenticado() {
+  return Boolean(obterToken());
+}
+
+function sair() {
+  localStorage.removeItem("tokenOrganizador");
+  localStorage.removeItem("organizadorLogado");
+  window.location.href = "./login.html";
+}
+
+function protegerPagina() {
+  if (!estaAutenticado()) {
+    window.location.href = "./login.html";
+  }
+}
+
+function configurarSessao() {
+  const organizador = obterOrganizadorLogado();
+
+  if (!organizador) {
+    usuarioLogadoBox.innerHTML = "<p>Nenhum organizador autenticado.</p>";
+    return;
+  }
+
+  usuarioLogadoBox.innerHTML = `
+    <p><strong>Organizador logado:</strong> ${organizador.nome}</p>
+    <p><strong>E-mail:</strong> ${organizador.email}</p>
+  `;
+
+  linkLogin.style.display = "none";
+}
+
 function formatarTexto(valor) {
-  if (!valor) return "Não informado";
-  return valor;
+  return valor || "Não informado";
 }
 
 function formatarData(data) {
@@ -116,7 +156,7 @@ async function carregarCampeonatos() {
   try {
     listaCampeonatos.innerHTML = "<p>Carregando campeonatos...</p>";
 
-    const campeonatos = await listarCampeonatos();
+    const campeonatos = await listarMeusCampeonatos();
 
     const resumos = await Promise.all(
       campeonatos.map(async (campeonato) => {
@@ -138,8 +178,7 @@ async function carregarCampeonatos() {
     );
 
     campeonatosComResumo = resumos;
-    const campeonatosFiltrados = aplicarFiltros(campeonatosComResumo);
-    renderizarCampeonatos(campeonatosFiltrados);
+    atualizarListaComFiltros();
   } catch (error) {
     listaCampeonatos.innerHTML = `<p>Erro ao carregar campeonatos: ${error.message}</p>`;
   }
@@ -207,5 +246,8 @@ formCampeonato.addEventListener("submit", async (event) => {
 botaoAtualizar.addEventListener("click", carregarCampeonatos);
 buscaCampeonato.addEventListener("input", atualizarListaComFiltros);
 filtroStatus.addEventListener("change", atualizarListaComFiltros);
+botaoLogout.addEventListener("click", sair);
 
+protegerPagina();
+configurarSessao();
 carregarCampeonatos();

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campeonatos Públicos</title>
+  <link rel="stylesheet" href="../css/estilo.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="cabecalho">
+      <h1>Campeonatos Públicos</h1>
+      <p>Veja campeonatos disponíveis, acompanhe resultados e encontre onde participar.</p>
+      <a href="./login.html" class="link-voltar">← Entrar na área do organizador</a>
+    </header>
+
+    <section class="card">
+      <div class="barra-filtros-publicos">
+        <div class="grupo-formulario">
+          <label for="busca-publica">Buscar por nome</label>
+          <input
+            type="text"
+            id="busca-publica"
+            placeholder="Digite parte do nome do campeonato"
+          />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="filtro-status-publico">Status</label>
+          <select id="filtro-status-publico">
+            <option value="TODOS">Todos</option>
+            <option value="INSCRICOES_ABERTAS">Inscrições abertas</option>
+            <option value="AGUARDANDO_CHAVEAMENTO">Aguardando chaveamento</option>
+            <option value="EM_ANDAMENTO">Em andamento</option>
+            <option value="FINALIZADO">Finalizado</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="filtro-categoria-publico">Categoria</label>
+          <select id="filtro-categoria-publico">
+            <option value="TODAS">Todas</option>
+            <option value="MASCULINO">Masculino</option>
+            <option value="FEMININO">Feminino</option>
+            <option value="MISTA">Mista</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="filtro-tipo-publico">Tipo</label>
+          <select id="filtro-tipo-publico">
+            <option value="TODOS">Todos</option>
+            <option value="DUPLA">Dupla</option>
+            <option value="TIME">Time</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="lista-campeonatos-publicos" class="lista-campeonatos">
+        <p>Carregando campeonatos...</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/campeonatos-publicos.js"></script>
+</body>
+</html>

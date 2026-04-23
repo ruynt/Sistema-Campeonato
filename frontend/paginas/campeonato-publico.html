@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campeonato Público</title>
+  <link rel="stylesheet" href="../css/estilo.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="cabecalho">
+      <h1>Detalhes do Campeonato</h1>
+      <p>Veja participantes, jogos e resultados do campeonato.</p>
+      <a href="./campeonatos-publicos.html" class="link-voltar">← Voltar para campeonatos públicos</a>
+    </header>
+
+    <section class="card">
+      <h2>Resumo do campeonato</h2>
+      <p id="mensagem-campeonato-publico" class="mensagem"></p>
+      <div id="dados-campeonato-publico"></div>
+    </section>
+
+    <section class="card">
+      <h2>Participantes</h2>
+      <div id="lista-participantes-publico">
+        <p>Carregando participantes...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Jogos</h2>
+      <div id="lista-jogos-publico">
+        <p>Carregando jogos...</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pódio</h2>
+      <div id="podio-publico">
+        <p>Pódio ainda não definido.</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/campeonato-publico.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import authRotas from "./rotas/auth.rotas.js";
 import campeonatoRotas from "./rotas/campeonato.rotas.js";
 import inscricaoRotas from "./rotas/inscricao.rotas.js";
 import chaveamentoRotas from "./rotas/chaveamento.rotas.js";
@@ -18,6 +19,7 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/auth", authRotas);
 app.use("/campeonatos", campeonatoRotas);
 app.use("/campeonatos", inscricaoRotas);
 app.use("/campeonatos", chaveamentoRotas);

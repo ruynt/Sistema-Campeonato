@@ -410,6 +410,71 @@ body {
   font-weight: bold;
 }
 
+.formulario-auth {
+  display: grid;
+  gap: 16px;
+}
+
+.abas-auth {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.oculto {
+  display: none;
+}
+
+.usuario-logado-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.topo-inicio {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.acoes-usuario {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.barra-filtros-publicos {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .barra-filtros-publicos {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .barra-filtros-publicos {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .topo-inicio {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 700px) {
   .barra-filtros {
     grid-template-columns: 1fr;

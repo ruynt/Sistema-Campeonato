@@ -29,6 +29,16 @@ enum StatusJogo {
   FINALIZADO
 }
 
+model Organizador {
+  id          Int          @id @default(autoincrement())
+  nome        String
+  email       String       @unique
+  senhaHash   String
+  criadoEm    DateTime     @default(now())
+
+  campeonatos Campeonato[]
+}
+
 model Campeonato {
   id                Int                  @id @default(autoincrement())
   nome              String
@@ -39,6 +49,9 @@ model Campeonato {
   quantidadeMaxima  Int?
   inscricoesAbertas Boolean              @default(true)
   criadoEm          DateTime             @default(now())
+
+  organizadorId     Int
+  organizador       Organizador          @relation(fields: [organizadorId], references: [id], onDelete: Cascade)
 
   participantes     Participante[]
   jogos             Jogo[]

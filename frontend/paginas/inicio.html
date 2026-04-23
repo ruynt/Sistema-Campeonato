@@ -8,12 +8,22 @@
 </head>
 <body>
   <main class="container">
-    <header class="cabecalho">
-      <h1>Sistema de Campeonato de Vôlei</h1>
-      <p>Crie campeonatos e gerencie inscrições, jogos e pódio.</p>
+    <header class="cabecalho topo-inicio">
+      <div>
+        <h1>Sistema de Campeonato de Vôlei</h1>
+        <p>Crie campeonatos e gerencie inscrições, jogos e pódio.</p>
+        <a href="./campeonatos-publicos.html" class="link-voltar">Ver campeonatos públicos</a>
+      </div>
+
+      <div class="acoes-usuario">
+        <a href="./login.html" id="link-login" class="botao secundario">Ir para login</a>
+        <button id="botao-logout" class="botao secundario" type="button">Sair</button>
+      </div>
     </header>
 
     <section class="card">
+      <div id="usuario-logado-box" class="usuario-logado-box"></div>
+
       <h2>Criar campeonato</h2>
 
       <form id="form-campeonato" class="formulario">

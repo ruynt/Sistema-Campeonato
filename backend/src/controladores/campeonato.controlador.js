@@ -38,7 +38,8 @@ async function criar(req, res) {
       local,
       tipoParticipante,
       categoria,
-      quantidadeMaxima
+      quantidadeMaxima,
+      organizadorId: req.organizador.id
     });
 
     return res.status(201).json(campeonato);
@@ -97,9 +98,38 @@ async function excluir(req, res) {
   }
 }
 
+async function listarMeus(req, res) {
+  try {
+    const campeonatos = await campeonatoServico.listarPorOrganizador(
+      req.organizador.id
+    );
+
+    return res.json(campeonatos);
+  } catch (error) {
+    return res.status(500).json({
+      erro: "Erro ao listar campeonatos do organizador.",
+      detalhe: error.message
+    });
+  }
+}
+
+async function listarPublicos(req, res) {
+  try {
+    const campeonatos = await campeonatoServico.listarPublicos();
+    return res.json(campeonatos);
+  } catch (error) {
+    return res.status(500).json({
+      erro: "Erro ao listar campeonatos públicos.",
+      detalhe: error.message
+    });
+  }
+}
+
 export default {
   criar,
   listar,
+  listarMeus,
+  listarPublicos,
   buscarPorId,
   excluir
 };

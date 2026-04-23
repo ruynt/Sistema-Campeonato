@@ -4,7 +4,8 @@ import {
   gerarChaveamento,
   registrarPlacar,
   excluirInscricao,
-  excluirCampeonato
+  excluirCampeonato,
+  obterToken
 } from "./api.js";
 
 const params = new URLSearchParams(window.location.search);
@@ -19,8 +20,45 @@ const botaoEncerrar = document.getElementById("botao-encerrar");
 const botaoChaveamento = document.getElementById("botao-chaveamento");
 const botaoCopiarLink = document.getElementById("botao-copiar-link");
 const botaoExcluirCampeonato = document.getElementById("botao-excluir-campeonato");
+const botaoLogout = document.getElementById("botao-logout");
+const usuarioLogadoBox = document.getElementById("usuario-logado-box");
 
 let resumoAtual = null;
+
+function obterOrganizadorLogado() {
+  const dados = localStorage.getItem("organizadorLogado");
+  return dados ? JSON.parse(dados) : null;
+}
+
+function estaAutenticado() {
+  return Boolean(obterToken());
+}
+
+function protegerPagina() {
+  if (!estaAutenticado()) {
+    window.location.href = "./login.html";
+  }
+}
+
+function configurarSessao() {
+  const organizador = obterOrganizadorLogado();
+
+  if (!organizador) {
+    usuarioLogadoBox.innerHTML = "<p>Nenhum organizador autenticado.</p>";
+    return;
+  }
+
+  usuarioLogadoBox.innerHTML = `
+    <p><strong>Organizador logado:</strong> ${organizador.nome}</p>
+    <p><strong>E-mail:</strong> ${organizador.email}</p>
+  `;
+}
+
+function sair() {
+  localStorage.removeItem("tokenOrganizador");
+  localStorage.removeItem("organizadorLogado");
+  window.location.href = "./login.html";
+}
 
 function formatarData(data) {
   if (!data) return "Não informada";
@@ -64,14 +102,14 @@ function classeStatusCampeonato(status) {
   return mapa[status] || "status-aguardando";
 }
 
-function quantidadeMinimaParaChaveamento(tipoParticipante) {
+function quantidadeMinimaParaChaveamento() {
   return 2;
 }
 
 function quantidadeValidaParaGerarChaveamento(resumo) {
   const total = resumo.totais.participantes;
 
-  if (total < quantidadeMinimaParaChaveamento(resumo.campeonato.tipoParticipante)) {
+  if (total < quantidadeMinimaParaChaveamento()) {
     return false;
   }
 
@@ -437,6 +475,7 @@ async function carregarResumo(limparMensagemPrincipal = true) {
 }
 
 botaoCopiarLink.addEventListener("click", copiarLinkInscricao);
+botaoLogout.addEventListener("click", sair);
 
 botaoEncerrar.addEventListener("click", async () => {
   try {
@@ -476,4 +515,6 @@ botaoExcluirCampeonato.addEventListener("click", async () => {
   }
 });
 
+protegerPagina();
+configurarSessao();
 carregarResumo();
