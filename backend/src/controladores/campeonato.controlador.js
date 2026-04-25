@@ -8,6 +8,7 @@ async function criar(req, res) {
       local,
       tipoParticipante,
       categoria,
+      formato,
       quantidadeMaxima
     } = req.body;
 
@@ -19,6 +20,7 @@ async function criar(req, res) {
 
     const tiposValidos = ["DUPLA", "TIME"];
     const categoriasValidas = ["MASCULINO", "FEMININO", "MISTA"];
+    const formatosValidos = ["MATA_MATA", "DUPLA_ELIMINACAO", "TODOS_CONTRA_TODOS"];
 
     if (!tiposValidos.includes(tipoParticipante)) {
       return res.status(400).json({
@@ -32,14 +34,20 @@ async function criar(req, res) {
       });
     }
 
+    if (formato && !formatosValidos.includes(formato)) {
+      return res.status(400).json({
+        erro: "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO ou TODOS_CONTRA_TODOS."
+      });
+    }
+
     const campeonato = await campeonatoServico.criar({
       nome,
       data,
       local,
       tipoParticipante,
       categoria,
-      quantidadeMaxima,
-      organizadorId: req.organizador.id
+      formato,
+      quantidadeMaxima
     });
 
     return res.status(201).json(campeonato);
@@ -58,6 +66,30 @@ async function listar(req, res) {
   } catch (error) {
     return res.status(500).json({
       erro: "Erro ao listar campeonatos.",
+      detalhe: error.message
+    });
+  }
+}
+
+async function listarMeus(req, res) {
+  try {
+    const campeonatos = await campeonatoServico.listar();
+    return res.json(campeonatos);
+  } catch (error) {
+    return res.status(500).json({
+      erro: "Erro ao listar campeonatos administrativos.",
+      detalhe: error.message
+    });
+  }
+}
+
+async function listarPublicos(req, res) {
+  try {
+    const campeonatos = await campeonatoServico.listarPublicos();
+    return res.json(campeonatos);
+  } catch (error) {
+    return res.status(500).json({
+      erro: "Erro ao listar campeonatos públicos.",
       detalhe: error.message
     });
   }
@@ -98,29 +130,61 @@ async function excluir(req, res) {
   }
 }
 
-async function listarMeus(req, res) {
+async function atualizar(req, res) {
   try {
-    const campeonatos = await campeonatoServico.listarPorOrganizador(
-      req.organizador.id
-    );
+    const { id } = req.params;
+    const {
+      nome,
+      data,
+      local,
+      tipoParticipante,
+      categoria,
+      formato,
+      quantidadeMaxima
+    } = req.body;
 
-    return res.json(campeonatos);
-  } catch (error) {
-    return res.status(500).json({
-      erro: "Erro ao listar campeonatos do organizador.",
-      detalhe: error.message
+    if (!nome || !tipoParticipante || !categoria) {
+      return res.status(400).json({
+        erro: "Nome, tipoParticipante e categoria são obrigatórios."
+      });
+    }
+
+    const tiposValidos = ["DUPLA", "TIME"];
+    const categoriasValidas = ["MASCULINO", "FEMININO", "MISTA"];
+    const formatosValidos = ["MATA_MATA", "DUPLA_ELIMINACAO", "TODOS_CONTRA_TODOS"];
+
+    if (!tiposValidos.includes(tipoParticipante)) {
+      return res.status(400).json({
+        erro: "tipoParticipante inválido. Use DUPLA ou TIME."
+      });
+    }
+
+    if (!categoriasValidas.includes(categoria)) {
+      return res.status(400).json({
+        erro: "categoria inválida. Use MASCULINO, FEMININO ou MISTA."
+      });
+    }
+
+    if (formato && !formatosValidos.includes(formato)) {
+      return res.status(400).json({
+        erro: "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO ou TODOS_CONTRA_TODOS."
+      });
+    }
+
+    const campeonato = await campeonatoServico.atualizar(id, {
+      nome,
+      data,
+      local,
+      tipoParticipante,
+      categoria,
+      formato,
+      quantidadeMaxima
     });
-  }
-}
 
-async function listarPublicos(req, res) {
-  try {
-    const campeonatos = await campeonatoServico.listarPublicos();
-    return res.json(campeonatos);
+    return res.json(campeonato);
   } catch (error) {
-    return res.status(500).json({
-      erro: "Erro ao listar campeonatos públicos.",
-      detalhe: error.message
+    return res.status(400).json({
+      erro: error.message
     });
   }
 }
@@ -131,5 +195,6 @@ export default {
   listarMeus,
   listarPublicos,
   buscarPorId,
+  atualizar,
   excluir
 };

@@ -1,28 +1,36 @@
 const URL_BASE = "http://localhost:3333";
 
 function obterToken() {
-  return localStorage.getItem("tokenOrganizador");
+  return localStorage.getItem("tokenAdmin");
 }
 
-function obterCabecalhos(opcoes = {}) {
+function obterCabecalhos(headersExtras = {}, usarTokenAdmin = true) {
   const headers = {
     "Content-Type": "application/json",
-    ...(opcoes.headers || {})
+    ...headersExtras
   };
 
-  const token = obterToken();
+  if (usarTokenAdmin) {
+    const token = obterToken();
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    if (token && !headers.Authorization) {
+      headers.Authorization = `Bearer ${token}`;
+    }
   }
 
   return headers;
 }
 
 async function fazerRequisicao(caminho, opcoes = {}) {
+  const {
+    headers,
+    usarTokenAdmin = true,
+    ...restoOpcoes
+  } = opcoes;
+
   const resposta = await fetch(`${URL_BASE}${caminho}`, {
-    headers: obterCabecalhos(opcoes),
-    ...opcoes
+    ...restoOpcoes,
+    headers: obterCabecalhos(headers, usarTokenAdmin)
   });
 
   const dados = await resposta.json();
@@ -34,22 +42,43 @@ async function fazerRequisicao(caminho, opcoes = {}) {
   return dados;
 }
 
-async function cadastrarOrganizador(dados) {
-  return fazerRequisicao("/auth/cadastro", {
+async function loginAdmin(dados) {
+  return fazerRequisicao("/admin/login", {
     method: "POST",
     body: JSON.stringify(dados)
   });
 }
 
-async function loginOrganizador(dados) {
-  return fazerRequisicao("/auth/login", {
+async function cadastrarParticipante(dados) {
+  return fazerRequisicao("/usuarios/cadastro", {
     method: "POST",
     body: JSON.stringify(dados)
+  });
+}
+
+async function loginParticipante(dados) {
+  return fazerRequisicao("/usuarios/login", {
+    method: "POST",
+    body: JSON.stringify(dados)
+  });
+}
+
+async function listarMinhasInscricoes() {
+  const tokenParticipante = localStorage.getItem("tokenParticipante");
+
+  return fazerRequisicao("/usuarios/minhas-inscricoes", {
+    method: "GET",
+    headers: tokenParticipante
+      ? { Authorization: `Bearer ${tokenParticipante}` }
+      : {},
+    usarTokenAdmin: false
   });
 }
 
 async function listarCampeonatos() {
-  return fazerRequisicao("/campeonatos");
+  return fazerRequisicao("/campeonatos", {
+    usarTokenAdmin: false
+  });
 }
 
 async function criarCampeonato(dadosCampeonato) {
@@ -63,8 +92,20 @@ async function buscarResumoCampeonato(id) {
   return fazerRequisicao(`/campeonatos/${id}/resumo`);
 }
 
+async function buscarResumoCampeonatoPublico(id) {
+  return fazerRequisicao(`/campeonatos/${id}/resumo-publico`, {
+    usarTokenAdmin: false
+  });
+}
+
 async function encerrarInscricoes(id) {
   return fazerRequisicao(`/campeonatos/${id}/encerrar-inscricoes`, {
+    method: "PATCH"
+  });
+}
+
+async function reabrirInscricoes(id) {
+  return fazerRequisicao(`/campeonatos/${id}/reabrir-inscricoes`, {
     method: "PATCH"
   });
 }
@@ -76,13 +117,21 @@ async function gerarChaveamento(id) {
 }
 
 async function buscarCampeonatoPorId(id) {
-  return fazerRequisicao(`/campeonatos/${id}`);
+  return fazerRequisicao(`/campeonatos/${id}`, {
+    usarTokenAdmin: false
+  });
 }
 
 async function criarInscricao(campeonatoId, dadosInscricao) {
+  const tokenParticipante = localStorage.getItem("tokenParticipante");
+
   return fazerRequisicao(`/campeonatos/${campeonatoId}/inscricoes`, {
     method: "POST",
-    body: JSON.stringify(dadosInscricao)
+    headers: tokenParticipante
+      ? { Authorization: `Bearer ${tokenParticipante}` }
+      : {},
+    body: JSON.stringify(dadosInscricao),
+    usarTokenAdmin: false
   });
 }
 
@@ -110,23 +159,45 @@ async function listarMeusCampeonatos() {
 }
 
 async function listarCampeonatosPublicos() {
-  return fazerRequisicao("/campeonatos/publicos");
+  return fazerRequisicao("/campeonatos/publicos", {
+    usarTokenAdmin: false
+  });
+}
+
+async function atualizarCampeonato(campeonatoId, dadosCampeonato) {
+  return fazerRequisicao(`/campeonatos/${campeonatoId}`, {
+    method: "PUT",
+    body: JSON.stringify(dadosCampeonato)
+  });
+}
+
+async function atualizarInscricao(inscricaoId, dadosInscricao) {
+  return fazerRequisicao(`/campeonatos/inscricoes/${inscricaoId}`, {
+    method: "PUT",
+    body: JSON.stringify(dadosInscricao)
+  });
 }
 
 export {
-  cadastrarOrganizador,
-  loginOrganizador,
+  loginAdmin,
+  cadastrarParticipante,
+  loginParticipante,
+  listarMinhasInscricoes,
   listarCampeonatos,
   listarMeusCampeonatos,
   listarCampeonatosPublicos,
   criarCampeonato,
   buscarResumoCampeonato,
+  buscarResumoCampeonatoPublico,
   encerrarInscricoes,
+  reabrirInscricoes,
   gerarChaveamento,
   buscarCampeonatoPorId,
   criarInscricao,
   registrarPlacar,
   excluirInscricao,
   excluirCampeonato,
+  atualizarInscricao,
+  atualizarCampeonato,
   obterToken
 };

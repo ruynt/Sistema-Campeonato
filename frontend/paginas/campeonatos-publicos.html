@@ -8,21 +8,26 @@
 </head>
 <body>
   <main class="container">
-    <header class="cabecalho">
-      <h1>Campeonatos Públicos</h1>
-      <p>Veja campeonatos disponíveis, acompanhe resultados e encontre onde participar.</p>
-      <a href="./login.html" class="link-voltar">← Entrar na área do organizador</a>
+    <header class="cabecalho topo-inicio">
+      <div>
+        <h1>Campeonatos Públicos</h1>
+        <p>Veja campeonatos disponíveis, acompanhe resultados e encontre onde participar.</p>
+      </div>
+
+      <div class="acoes-usuario">
+        <a id="link-minhas-inscricoes" href="./minhas-inscricoes.html" class="botao secundario oculto">Minhas inscrições</a>
+        <a id="link-participante" href="./participante.html" class="botao secundario">Entrar / cadastrar</a>
+        <button id="botao-logout-participante" class="botao secundario oculto" type="button">Sair</button>
+      </div>
     </header>
+
+    <div id="participante-logado-box" class="usuario-logado-box oculto"></div>
 
     <section class="card">
       <div class="barra-filtros-publicos">
         <div class="grupo-formulario">
           <label for="busca-publica">Buscar por nome</label>
-          <input
-            type="text"
-            id="busca-publica"
-            placeholder="Digite parte do nome do campeonato"
-          />
+          <input type="text" id="busca-publica" placeholder="Digite parte do nome do campeonato" />
         </div>
 
         <div class="grupo-formulario">
@@ -51,7 +56,7 @@
           <select id="filtro-tipo-publico">
             <option value="TODOS">Todos</option>
             <option value="DUPLA">Dupla</option>
-            <option value="TIME">Time</option>
+            <option value="TIME">Quarteto</option>
           </select>
         </div>
       </div>
@@ -60,6 +65,10 @@
         <p>Carregando campeonatos...</p>
       </div>
     </section>
+
+    <footer class="rodape-publico">
+      <a href="./login.html" class="link-admin-discreto">Área administrativa</a>
+    </footer>
   </main>
 
   <script type="module" src="../js/campeonatos-publicos.js"></script>

@@ -1,41 +1,6 @@
 import { prisma } from "../banco/prisma.js";
 
-async function buscarResumo(campeonatoId) {
-  const campeonato = await prisma.campeonato.findUnique({
-    where: {
-      id: Number(campeonatoId)
-    },
-    include: {
-      participantes: {
-        include: {
-          jogadores: true
-        },
-        orderBy: {
-          criadoEm: "asc"
-        }
-      },
-      jogos: {
-        include: {
-          equipeA: true,
-          equipeB: true,
-          vencedor: true,
-          sets: {
-            orderBy: {
-              numeroSet: "asc"
-            }
-          }
-        },
-        orderBy: {
-          id: "asc"
-        }
-      }
-    }
-  });
-
-  if (!campeonato) {
-    throw new Error("Campeonato não encontrado.");
-  }
-
+function montarResumo(campeonato, incluirContato = false) {
   const totalParticipantes = campeonato.participantes.length;
   const totalJogos = campeonato.jogos.length;
   const jogosFinalizados = campeonato.jogos.filter(
@@ -81,6 +46,18 @@ async function buscarResumo(campeonatoId) {
     statusCampeonato = "FINALIZADO";
   }
 
+  const participantes = campeonato.participantes.map((participante) => ({
+    id: participante.id,
+    nomeEquipe: participante.nomeEquipe,
+    responsavel: participante.responsavel,
+    ...(incluirContato ? { contato: participante.contato } : {}),
+    statusInscricao: participante.statusInscricao,
+    criadoEm: participante.criadoEm,
+    campeonatoId: participante.campeonatoId,
+    usuarioId: participante.usuarioId,
+    jogadores: participante.jogadores
+  }));
+
   return {
     campeonato: {
       id: campeonato.id,
@@ -89,6 +66,7 @@ async function buscarResumo(campeonatoId) {
       local: campeonato.local,
       tipoParticipante: campeonato.tipoParticipante,
       categoria: campeonato.categoria,
+      formato: campeonato.formato,
       quantidadeMaxima: campeonato.quantidadeMaxima,
       inscricoesAbertas: campeonato.inscricoesAbertas,
       criadoEm: campeonato.criadoEm
@@ -99,12 +77,62 @@ async function buscarResumo(campeonatoId) {
       jogos: totalJogos,
       jogosFinalizados
     },
-    participantes: campeonato.participantes,
+    participantes,
     jogos: campeonato.jogos,
     podio
   };
 }
 
+async function buscarCampeonatoComRelacionamentos(campeonatoId) {
+  const campeonato = await prisma.campeonato.findUnique({
+    where: {
+      id: Number(campeonatoId)
+    },
+    include: {
+      participantes: {
+        include: {
+          jogadores: true
+        },
+        orderBy: {
+          criadoEm: "asc"
+        }
+      },
+      jogos: {
+        include: {
+          equipeA: true,
+          equipeB: true,
+          vencedor: true,
+          sets: {
+            orderBy: {
+              numeroSet: "asc"
+            }
+          }
+        },
+        orderBy: {
+          id: "asc"
+        }
+      }
+    }
+  });
+
+  if (!campeonato) {
+    throw new Error("Campeonato não encontrado.");
+  }
+
+  return campeonato;
+}
+
+async function buscarResumoAdmin(campeonatoId) {
+  const campeonato = await buscarCampeonatoComRelacionamentos(campeonatoId);
+  return montarResumo(campeonato, true);
+}
+
+async function buscarResumoPublico(campeonatoId) {
+  const campeonato = await buscarCampeonatoComRelacionamentos(campeonatoId);
+  return montarResumo(campeonato, false);
+}
+
 export default {
-  buscarResumo
+  buscarResumoAdmin,
+  buscarResumoPublico
 };

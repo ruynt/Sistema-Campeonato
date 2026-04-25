@@ -7,8 +7,24 @@ const dadosCampeonatoPublico = document.getElementById("dados-campeonato-publico
 const formInscricao = document.getElementById("form-inscricao");
 const jogadoresContainer = document.getElementById("jogadores-container");
 const mensagemInscricao = document.getElementById("mensagem-inscricao");
+const campoTelefone = document.getElementById("telefone");
 
 let campeonatoAtual = null;
+
+function obterTokenParticipante() {
+  return localStorage.getItem("tokenParticipante");
+}
+
+function obterParticipanteLogado() {
+  const dados = localStorage.getItem("participanteLogado");
+  return dados ? JSON.parse(dados) : null;
+}
+
+function protegerPaginaParticipante() {
+  if (!obterTokenParticipante()) {
+    window.location.href = "./participante.html";
+  }
+}
 
 function formatarData(data) {
   if (!data) return "Não informada";
@@ -18,13 +34,22 @@ function formatarData(data) {
   });
 }
 
+function traduzirTipoParticipante(tipo) {
+  const mapa = {
+    DUPLA: "Dupla",
+    TIME: "Quarteto"
+  };
+
+  return mapa[tipo] || tipo;
+}
+
 function renderizarCabecalhoCampeonato(campeonato) {
   dadosCampeonatoPublico.innerHTML = `
     <div class="bloco-informacoes">
       <p><strong>Nome:</strong> ${campeonato.nome}</p>
       <p><strong>Data:</strong> ${formatarData(campeonato.data)}</p>
       <p><strong>Local:</strong> ${campeonato.local || "Não informado"}</p>
-      <p><strong>Tipo:</strong> ${campeonato.tipoParticipante}</p>
+      <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
       <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
       <p><strong>Inscrições abertas:</strong> ${campeonato.inscricoesAbertas ? "Sim" : "Não"}</p>
     </div>
@@ -80,6 +105,38 @@ function coletarJogadores() {
   return jogadores;
 }
 
+function preencherDadosParticipanteLogado() {
+  const participante = obterParticipanteLogado();
+
+  if (!participante) {
+    return;
+  }
+
+  const campoResponsavel = document.getElementById("responsavel");
+
+  if (campoResponsavel) {
+    campoResponsavel.value = participante.nome || "";
+  }
+}
+
+function formatarTelefone(valor) {
+  const numeros = valor.replace(/\D/g, "").slice(0, 11);
+
+  if (numeros.length <= 2) {
+    return numeros;
+  }
+
+  if (numeros.length <= 7) {
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`;
+  }
+
+  if (numeros.length <= 10) {
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`;
+  }
+
+  return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
+}
+
 async function carregarCampeonato() {
   if (!campeonatoId) {
     dadosCampeonatoPublico.innerHTML = "<p>ID do campeonato não informado.</p>";
@@ -91,6 +148,7 @@ async function carregarCampeonato() {
     campeonatoAtual = await buscarCampeonatoPorId(campeonatoId);
     renderizarCabecalhoCampeonato(campeonatoAtual);
     renderizarCamposJogadores(campeonatoAtual.tipoParticipante);
+    preencherDadosParticipanteLogado();
 
     if (!campeonatoAtual.inscricoesAbertas) {
       mensagemInscricao.textContent = "As inscrições deste campeonato estão encerradas.";
@@ -112,7 +170,7 @@ formInscricao.addEventListener("submit", async (event) => {
   const dadosInscricao = {
     nomeEquipe: formData.get("nomeEquipe"),
     responsavel: formData.get("responsavel"),
-    contato: formData.get("contato") || null,
+    contato: formData.get("telefone") || null,
     jogadores: coletarJogadores()
   };
 
@@ -121,9 +179,17 @@ formInscricao.addEventListener("submit", async (event) => {
     mensagemInscricao.textContent = "Inscrição enviada com sucesso.";
     formInscricao.reset();
     renderizarCamposJogadores(campeonatoAtual.tipoParticipante);
+    preencherDadosParticipanteLogado();
   } catch (error) {
     mensagemInscricao.textContent = `Erro ao enviar inscrição: ${error.message}`;
   }
 });
 
+if (campoTelefone) {
+  campoTelefone.addEventListener("input", (event) => {
+    event.target.value = formatarTelefone(event.target.value);
+  });
+}
+
+protegerPaginaParticipante();
 carregarCampeonato();

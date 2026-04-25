@@ -182,9 +182,44 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
   return await listarJogos(campeonatoId);
 }
 
+async function reabrirInscricoes(campeonatoId) {
+  const campeonato = await prisma.campeonato.findUnique({
+    where: {
+      id: Number(campeonatoId)
+    },
+    include: {
+      jogos: true
+    }
+  });
+
+  if (!campeonato) {
+    throw new Error("Campeonato não encontrado.");
+  }
+
+  if (campeonato.jogos.length > 0) {
+    throw new Error("Não é permitido reabrir inscrições após o chaveamento ter sido gerado.");
+  }
+
+  if (campeonato.inscricoesAbertas) {
+    throw new Error("As inscrições já estão abertas.");
+  }
+
+  const campeonatoAtualizado = await prisma.campeonato.update({
+    where: {
+      id: Number(campeonatoId)
+    },
+    data: {
+      inscricoesAbertas: true
+    }
+  });
+
+  return campeonatoAtualizado;
+}
+
 export default {
   encerrarInscricoes,
   gerarChaveamento,
   listarJogos,
+  reabrirInscricoes,
   gerarProximaFaseSePossivel
 };

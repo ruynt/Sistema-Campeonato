@@ -23,20 +23,27 @@
 
     <section class="card">
       <h2>Formulário de inscrição</h2>
-      <form id="form-inscricao" class="formulario">
+      <form id="form-inscricao" class="formulario" autocomplete="off">
         <div class="grupo-formulario">
           <label for="nomeEquipe">Nome da dupla/time</label>
           <input type="text" id="nomeEquipe" name="nomeEquipe" required />
         </div>
 
         <div class="grupo-formulario">
-          <label for="responsavel">Responsável</label>
+          <label for="responsavel">Capitã(o)</label>
           <input type="text" id="responsavel" name="responsavel" required />
         </div>
 
         <div class="grupo-formulario">
-          <label for="contato">Contato</label>
-          <input type="text" id="contato" name="contato" />
+          <label for="telefone">Telefone para contato</label>
+          <input
+            type="tel"
+            id="telefone"
+            name="telefone"
+            placeholder="(83) 99999-9999"
+            autocomplete="tel"
+            inputmode="numeric"
+          />
         </div>
 
         <div id="jogadores-container" class="bloco-jogadores"></div>

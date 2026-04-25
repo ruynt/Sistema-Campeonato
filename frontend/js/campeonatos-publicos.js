@@ -5,8 +5,50 @@ const buscaPublica = document.getElementById("busca-publica");
 const filtroStatusPublico = document.getElementById("filtro-status-publico");
 const filtroCategoriaPublico = document.getElementById("filtro-categoria-publico");
 const filtroTipoPublico = document.getElementById("filtro-tipo-publico");
+const participanteLogadoBox = document.getElementById("participante-logado-box");
+const botaoLogoutParticipante = document.getElementById("botao-logout-participante");
+const linkParticipante = document.getElementById("link-participante");
+const linkMinhasInscricoes = document.getElementById("link-minhas-inscricoes");
 
 let campeonatos = [];
+
+function obterParticipanteLogado() {
+  const dados = localStorage.getItem("participanteLogado");
+  return dados ? JSON.parse(dados) : null;
+}
+
+function obterTokenParticipante() {
+  return localStorage.getItem("tokenParticipante");
+}
+
+function configurarSessaoParticipante() {
+  const participante = obterParticipanteLogado();
+  const token = obterTokenParticipante();
+
+  if (!participante || !token) {
+    participanteLogadoBox.classList.add("oculto");
+    botaoLogoutParticipante.classList.add("oculto");
+    linkParticipante.classList.remove("oculto");
+    linkMinhasInscricoes.classList.add("oculto");
+    return;
+  }
+
+  participanteLogadoBox.innerHTML = `
+    <p><strong>Participante logado:</strong> ${participante.nome}</p>
+    <p><strong>E-mail:</strong> ${participante.email}</p>
+  `;
+
+  participanteLogadoBox.classList.remove("oculto");
+  botaoLogoutParticipante.classList.remove("oculto");
+  linkParticipante.classList.add("oculto");
+  linkMinhasInscricoes.classList.remove("oculto");
+}
+
+function sairParticipante() {
+  localStorage.removeItem("tokenParticipante");
+  localStorage.removeItem("participanteLogado");
+  window.location.href = "./campeonatos-publicos.html";
+}
 
 function formatarData(data) {
   if (!data) return "Não informada";
@@ -36,6 +78,25 @@ function classeStatusCampeonato(status) {
   };
 
   return mapa[status] || "status-aguardando";
+}
+
+function traduzirTipoParticipante(tipo) {
+  const mapa = {
+    DUPLA: "Dupla",
+    TIME: "Quarteto"
+  };
+
+  return mapa[tipo] || tipo;
+}
+
+function traduzirFormato(formato) {
+  const mapa = {
+    MATA_MATA: "Mata-mata",
+    DUPLA_ELIMINACAO: "Upper/Lower",
+    TODOS_CONTRA_TODOS: "Todos contra todos"
+  };
+
+  return mapa[formato] || formato;
 }
 
 function aplicarFiltros(lista) {
@@ -71,8 +132,9 @@ function renderizarCampeonatos(lista) {
           <h3>${campeonato.nome}</h3>
           <p><strong>Data:</strong> ${formatarData(campeonato.data)}</p>
           <p><strong>Local:</strong> ${campeonato.local || "Não informado"}</p>
-          <p><strong>Tipo:</strong> ${campeonato.tipoParticipante}</p>
+          <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
           <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
+          <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
           <p><strong>Participantes:</strong> ${campeonato.totais.participantes}</p>
           <p><strong>Jogos:</strong> ${campeonato.totais.jogos}</p>
           <p><strong>Inscrições abertas:</strong> ${
@@ -118,5 +180,7 @@ buscaPublica.addEventListener("input", atualizarLista);
 filtroStatusPublico.addEventListener("change", atualizarLista);
 filtroCategoriaPublico.addEventListener("change", atualizarLista);
 filtroTipoPublico.addEventListener("change", atualizarLista);
+botaoLogoutParticipante.addEventListener("click", sairParticipante);
 
+configurarSessaoParticipante();
 carregarCampeonatosPublicos();

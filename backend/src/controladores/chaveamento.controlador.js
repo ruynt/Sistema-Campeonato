@@ -42,8 +42,26 @@ async function listarJogos(req, res) {
   }
 }
 
+async function reabrirInscricoes(req, res) {
+  try {
+    const { id } = req.params;
+
+    const campeonato = await chaveamentoServico.reabrirInscricoes(id);
+
+    return res.json({
+      mensagem: "Inscrições reabertas com sucesso.",
+      campeonato
+    });
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
 export default {
   encerrarInscricoes,
   gerarChaveamento,
+  reabrirInscricoes,
   listarJogos
 };

@@ -1,10 +1,13 @@
 import {
   buscarResumoCampeonato,
   encerrarInscricoes,
+  reabrirInscricoes,
   gerarChaveamento,
   registrarPlacar,
   excluirInscricao,
   excluirCampeonato,
+  atualizarInscricao,
+  atualizarCampeonato,
   obterToken
 } from "./api.js";
 
@@ -17,16 +20,20 @@ const listaJogos = document.getElementById("lista-jogos");
 const podio = document.getElementById("podio");
 const mensagemCampeonato = document.getElementById("mensagem-campeonato");
 const botaoEncerrar = document.getElementById("botao-encerrar");
+const botaoReabrir = document.getElementById("botao-reabrir");
 const botaoChaveamento = document.getElementById("botao-chaveamento");
 const botaoCopiarLink = document.getElementById("botao-copiar-link");
 const botaoExcluirCampeonato = document.getElementById("botao-excluir-campeonato");
 const botaoLogout = document.getElementById("botao-logout");
 const usuarioLogadoBox = document.getElementById("usuario-logado-box");
+const chaveCampeonato = document.getElementById("chave-campeonato");
 
 let resumoAtual = null;
+let inscricaoEmEdicaoId = null;
+let campeonatoEmEdicao = false;
 
-function obterOrganizadorLogado() {
-  const dados = localStorage.getItem("organizadorLogado");
+function obterAdminLogado() {
+  const dados = localStorage.getItem("adminLogado");
   return dados ? JSON.parse(dados) : null;
 }
 
@@ -41,22 +48,22 @@ function protegerPagina() {
 }
 
 function configurarSessao() {
-  const organizador = obterOrganizadorLogado();
+  const admin = obterAdminLogado();
 
-  if (!organizador) {
-    usuarioLogadoBox.innerHTML = "<p>Nenhum organizador autenticado.</p>";
+  if (!admin) {
+    usuarioLogadoBox.innerHTML = "<p>Nenhum administrador autenticado.</p>";
     return;
   }
 
   usuarioLogadoBox.innerHTML = `
-    <p><strong>Organizador logado:</strong> ${organizador.nome}</p>
-    <p><strong>E-mail:</strong> ${organizador.email}</p>
+    <p><strong>Administrador logado:</strong> ${admin.nome}</p>
+    <p><strong>E-mail:</strong> ${admin.email}</p>
   `;
 }
 
 function sair() {
-  localStorage.removeItem("tokenOrganizador");
-  localStorage.removeItem("organizadorLogado");
+  localStorage.removeItem("tokenAdmin");
+  localStorage.removeItem("adminLogado");
   window.location.href = "./login.html";
 }
 
@@ -66,6 +73,30 @@ function formatarData(data) {
   return new Date(data).toLocaleDateString("pt-BR", {
     timeZone: "UTC"
   });
+}
+
+function formatarDataInput(data) {
+  if (!data) return "";
+  return new Date(data).toISOString().split("T")[0];
+}
+
+function traduzirTipoParticipante(tipo) {
+  const mapa = {
+    DUPLA: "Dupla",
+    TIME: "Quarteto"
+  };
+
+  return mapa[tipo] || tipo;
+}
+
+function traduzirFormato(formato) {
+  const mapa = {
+    MATA_MATA: "Mata-mata",
+    DUPLA_ELIMINACAO: "Upper/Lower",
+    TODOS_CONTRA_TODOS: "Todos contra todos"
+  };
+
+  return mapa[formato] || formato;
 }
 
 function traduzirFase(fase) {
@@ -145,6 +176,9 @@ function atualizarEstadoBotoes(resumo) {
   const podeGerar = quantidadeValidaParaGerarChaveamento(resumo);
 
   botaoEncerrar.disabled = inscricoesFechadas || finalizado;
+  if (botaoReabrir) {
+    botaoReabrir.disabled = !inscricoesFechadas || jaTemJogos || finalizado;
+  }
   botaoChaveamento.disabled =
     jaTemJogos ||
     finalizado ||
@@ -152,19 +186,105 @@ function atualizarEstadoBotoes(resumo) {
     !podeGerar;
 }
 
+function renderizarFormularioEdicaoCampeonato(resumo) {
+  const campeonato = resumo.campeonato;
+  const possuiInscritos = resumo.totais.participantes > 0;
+  const minimoQuantidade = Math.max(1, resumo.totais.participantes);
+
+  return `
+    <div class="area-edicao-campeonato">
+      <h4>Editar campeonato</h4>
+
+      ${
+        possuiInscritos
+          ? `
+            <p class="info-auxiliar">
+              Como já existem participantes inscritos, os campos Tipo, Categoria e Formato não podem mais ser alterados.
+            </p>
+          `
+          : ""
+      }
+
+      <form id="form-edicao-campeonato" class="formulario-edicao-campeonato">
+        <div class="grupo-formulario">
+          <label>Nome</label>
+          <input type="text" name="nome" value="${campeonato.nome}" required />
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Data</label>
+          <input type="date" name="data" value="${formatarDataInput(campeonato.data)}" />
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Local</label>
+          <input type="text" name="local" value="${campeonato.local || ""}" />
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Tipo</label>
+          <select name="tipoParticipante" ${possuiInscritos ? "disabled" : ""} required>
+            <option value="DUPLA" ${campeonato.tipoParticipante === "DUPLA" ? "selected" : ""}>Dupla</option>
+            <option value="TIME" ${campeonato.tipoParticipante === "TIME" ? "selected" : ""}>Quarteto</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Categoria</label>
+          <select name="categoria" ${possuiInscritos ? "disabled" : ""} required>
+            <option value="MASCULINO" ${campeonato.categoria === "MASCULINO" ? "selected" : ""}>Masculino</option>
+            <option value="FEMININO" ${campeonato.categoria === "FEMININO" ? "selected" : ""}>Feminino</option>
+            <option value="MISTA" ${campeonato.categoria === "MISTA" ? "selected" : ""}>Mista</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Formato</label>
+          <select name="formato" ${possuiInscritos ? "disabled" : ""} required>
+            <option value="MATA_MATA" ${campeonato.formato === "MATA_MATA" ? "selected" : ""}>Mata-mata</option>
+            <option value="DUPLA_ELIMINACAO" ${campeonato.formato === "DUPLA_ELIMINACAO" ? "selected" : ""}>Upper/Lower</option>
+            <option value="TODOS_CONTRA_TODOS" ${campeonato.formato === "TODOS_CONTRA_TODOS" ? "selected" : ""}>Todos contra todos</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Quantidade máxima</label>
+          <input
+            type="number"
+            name="quantidadeMaxima"
+            min="${minimoQuantidade}"
+            value="${campeonato.quantidadeMaxima ?? ""}"
+          />
+        </div>
+
+        <div class="acoes-card">
+          <button type="submit" class="botao-pequeno">Salvar campeonato</button>
+          <button type="button" id="botao-cancelar-edicao-campeonato" class="botao-pequeno secundario">
+            Cancelar
+          </button>
+        </div>
+
+        <p id="mensagem-edicao-campeonato" class="mensagem-edicao-inscricao"></p>
+      </form>
+    </div>
+  `;
+}
+
 function renderizarResumo(resumo) {
   const campeonato = resumo.campeonato;
   const textoStatus = traduzirStatusCampeonato(resumo.statusCampeonato);
   const classeStatus = classeStatusCampeonato(resumo.statusCampeonato);
   const mensagemChaveamento = mensagemApoioChaveamento(resumo);
+  const podeEditarCampeonato = resumo.jogos.length === 0;
 
   dadosCampeonato.innerHTML = `
     <div class="bloco-informacoes">
       <p><strong>Nome:</strong> ${campeonato.nome}</p>
       <p><strong>Data:</strong> ${formatarData(campeonato.data)}</p>
       <p><strong>Local:</strong> ${campeonato.local || "Não informado"}</p>
-      <p><strong>Tipo:</strong> ${campeonato.tipoParticipante}</p>
+      <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
       <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
+      <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
       <p><strong>Quantidade máxima:</strong> ${campeonato.quantidadeMaxima ?? "Não definida"}</p>
       <p><strong>Inscrições abertas:</strong> ${campeonato.inscricoesAbertas ? "Sim" : "Não"}</p>
       <p><strong>Total de participantes:</strong> ${resumo.totais.participantes}</p>
@@ -173,7 +293,110 @@ function renderizarResumo(resumo) {
       <span class="status-badge ${classeStatus}">${textoStatus}</span>
       <p class="info-auxiliar">Use o botão de copiar link para enviar a página pública de inscrição aos participantes.</p>
       <p class="info-auxiliar"><strong>Chaveamento:</strong> ${mensagemChaveamento}</p>
+
+      ${
+        podeEditarCampeonato
+          ? `
+            <div class="acoes-card" style="margin-top: 16px;">
+              <button id="botao-editar-campeonato" class="botao-pequeno" type="button">
+                Editar campeonato
+              </button>
+            </div>
+          `
+          : `
+            <p class="info-auxiliar">
+              A edição do campeonato fica indisponível após gerar o chaveamento.
+            </p>
+          `
+      }
+
+      ${campeonatoEmEdicao && podeEditarCampeonato ? renderizarFormularioEdicaoCampeonato(resumo) : ""}
     </div>
+  `;
+
+  if (podeEditarCampeonato) {
+    conectarEventosEdicaoCampeonato();
+    conectarFormularioEdicaoCampeonato();
+    conectarCancelarEdicaoCampeonato();
+  }
+}
+
+function renderizarFormularioEdicao(participante) {
+  return `
+    <form class="formulario-edicao-inscricao" data-form-edicao-id="${participante.id}">
+      <div class="grupo-formulario">
+        <label>Nome da equipe</label>
+        <input
+          type="text"
+          name="nomeEquipe"
+          value="${participante.nomeEquipe}"
+          required
+        />
+      </div>
+
+      <div class="grupo-formulario">
+        <label>Capitã(o)</label>
+        <input
+          type="text"
+          name="responsavel"
+          value="${participante.responsavel}"
+          required
+        />
+      </div>
+
+      <div class="grupo-formulario">
+        <label>Telefone para contato</label>
+        <input
+          type="tel"
+          name="contato"
+          value="${participante.contato || ""}"
+          placeholder="(83) 99999-9999"
+        />
+      </div>
+
+      <div class="bloco-jogadores-edicao">
+        ${participante.jogadores
+          .map(
+            (jogador, index) => `
+              <div class="card-jogador">
+                <h4>Jogador ${index + 1}</h4>
+
+                <div class="grupo-formulario">
+                  <label>Nome</label>
+                  <input
+                    type="text"
+                    name="jogador-nome-${index}"
+                    value="${jogador.nome}"
+                    required
+                  />
+                </div>
+
+                <div class="grupo-formulario">
+                  <label>Gênero</label>
+                  <select name="jogador-genero-${index}" required>
+                    <option value="M" ${jogador.genero === "M" ? "selected" : ""}>Masculino</option>
+                    <option value="F" ${jogador.genero === "F" ? "selected" : ""}>Feminino</option>
+                  </select>
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+
+      <div class="acoes-card">
+        <button type="submit" class="botao-pequeno">Salvar alterações</button>
+        <button
+          type="button"
+          class="botao-pequeno secundario"
+          data-cancelar-edicao-id="${participante.id}"
+        >
+          Cancelar
+        </button>
+      </div>
+
+      <p class="mensagem-edicao-inscricao" id="mensagem-edicao-${participante.id}"></p>
+    </form>
   `;
 }
 
@@ -183,17 +406,19 @@ function renderizarParticipantes(participantes) {
     return;
   }
 
-  const podeExcluirInscricao = resumoAtual ? resumoAtual.jogos.length === 0 : false;
+  const podeEditarOuExcluir = resumoAtual ? resumoAtual.jogos.length === 0 : false;
 
   listaParticipantes.innerHTML = `
     <div class="lista-simples">
       ${participantes
-        .map(
-          (participante) => `
+        .map((participante) => {
+          const estaEditando = inscricaoEmEdicaoId === participante.id;
+
+          return `
             <div class="item-lista">
               <h3>${participante.nomeEquipe}</h3>
-              <p><strong>Responsável:</strong> ${participante.responsavel}</p>
-              <p><strong>Contato:</strong> ${participante.contato || "Não informado"}</p>
+              <p><strong>Capitã(o):</strong> ${participante.responsavel}</p>
+              <p><strong>Telefone:</strong> ${participante.contato || "Não informado"}</p>
               <p><strong>Status:</strong> ${participante.statusInscricao}</p>
               <ul>
                 ${participante.jogadores
@@ -202,29 +427,52 @@ function renderizarParticipantes(participantes) {
               </ul>
 
               ${
-                podeExcluirInscricao
+                podeEditarOuExcluir
                   ? `
-                    <button
-                      class="botao-pequeno botao-excluir"
-                      data-inscricao-id="${participante.id}"
-                    >
-                      Excluir inscrição
-                    </button>
+                    <div class="acoes-card">
+                      <button
+                        class="botao-pequeno"
+                        data-editar-inscricao-id="${participante.id}"
+                      >
+                        Editar inscrição
+                      </button>
+
+                      <button
+                        class="botao-pequeno botao-excluir"
+                        data-inscricao-id="${participante.id}"
+                      >
+                        Excluir inscrição
+                      </button>
+                    </div>
                   `
                   : `
                     <p class="info-auxiliar">
-                      A exclusão de inscrição fica indisponível após gerar o chaveamento.
+                      A edição e exclusão de inscrição ficam indisponíveis após gerar o chaveamento.
                     </p>
                   `
               }
+
+              ${
+                estaEditando && podeEditarOuExcluir
+                  ? `
+                    <div class="area-edicao-inscricao">
+                      <h4>Editar inscrição</h4>
+                      ${renderizarFormularioEdicao(participante)}
+                    </div>
+                  `
+                  : ""
+              }
             </div>
-          `
-        )
+          `;
+        })
         .join("")}
     </div>
   `;
 
-  if (podeExcluirInscricao) {
+  if (podeEditarOuExcluir) {
+    conectarEventosEdicaoInscricao();
+    conectarEventosFormularioEdicaoInscricao();
+    conectarEventosCancelarEdicaoInscricao();
     conectarEventosExclusaoInscricao();
   }
 }
@@ -297,6 +545,149 @@ function montarFormularioPlacar(jogo) {
   `;
 }
 
+function conectarEventosEdicaoCampeonato() {
+  const botao = document.getElementById("botao-editar-campeonato");
+
+  if (!botao) return;
+
+  botao.addEventListener("click", () => {
+    campeonatoEmEdicao = true;
+    renderizarResumo(resumoAtual);
+    mensagemCampeonato.textContent = "";
+  });
+}
+
+function conectarFormularioEdicaoCampeonato() {
+  const form = document.getElementById("form-edicao-campeonato");
+
+  if (!form) return;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const mensagemEdicao = document.getElementById("mensagem-edicao-campeonato");
+
+    try {
+      mensagemEdicao.textContent = "Salvando campeonato...";
+
+      const quantidadeMaximaValor = form.querySelector('[name="quantidadeMaxima"]').value
+        ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
+        : null;
+
+      if (
+        quantidadeMaximaValor !== null &&
+        quantidadeMaximaValor < resumoAtual.totais.participantes
+      ) {
+        mensagemEdicao.textContent =
+          `Erro: a quantidade máxima não pode ser menor que o total atual de inscritos (${resumoAtual.totais.participantes}).`;
+        return;
+      }
+
+      await atualizarCampeonato(campeonatoId, {
+        nome: form.querySelector('[name="nome"]').value.trim(),
+        data: form.querySelector('[name="data"]').value || null,
+        local: form.querySelector('[name="local"]').value.trim() || null,
+        tipoParticipante: resumoAtual.totais.participantes > 0
+          ? resumoAtual.campeonato.tipoParticipante
+          : form.querySelector('[name="tipoParticipante"]').value,
+        categoria: resumoAtual.totais.participantes > 0
+          ? resumoAtual.campeonato.categoria
+          : form.querySelector('[name="categoria"]').value,
+        formato: resumoAtual.totais.participantes > 0
+          ? resumoAtual.campeonato.formato
+          : form.querySelector('[name="formato"]').value,
+        quantidadeMaxima: quantidadeMaximaValor
+      });
+
+      campeonatoEmEdicao = false;
+      await carregarResumo(false);
+      mensagemCampeonato.textContent = "Campeonato atualizado com sucesso.";
+    } catch (error) {
+      mensagemEdicao.textContent = `Erro: ${error.message}`;
+    }
+  });
+}
+
+function conectarCancelarEdicaoCampeonato() {
+  const botao = document.getElementById("botao-cancelar-edicao-campeonato");
+
+  if (!botao) return;
+
+  botao.addEventListener("click", () => {
+    campeonatoEmEdicao = false;
+    renderizarResumo(resumoAtual);
+    mensagemCampeonato.textContent = "Edição do campeonato cancelada.";
+  });
+}
+
+function conectarEventosEdicaoInscricao() {
+  const botoes = document.querySelectorAll("[data-editar-inscricao-id]");
+
+  botoes.forEach((botao) => {
+    botao.addEventListener("click", () => {
+      inscricaoEmEdicaoId = Number(botao.dataset.editarInscricaoId);
+      renderizarParticipantes(resumoAtual.participantes);
+      mensagemCampeonato.textContent = "";
+    });
+  });
+}
+
+function conectarEventosFormularioEdicaoInscricao() {
+  const formularios = document.querySelectorAll("[data-form-edicao-id]");
+
+  formularios.forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const inscricaoId = Number(form.dataset.formEdicaoId);
+      const mensagemEdicao = document.getElementById(`mensagem-edicao-${inscricaoId}`);
+
+      const participante = resumoAtual?.participantes?.find(
+        (item) => item.id === inscricaoId
+      );
+
+      if (!participante) {
+        mensagemEdicao.textContent = "Inscrição não encontrada para edição.";
+        return;
+      }
+
+      const jogadores = participante.jogadores.map((_, index) => ({
+        nome: form.querySelector(`[name="jogador-nome-${index}"]`).value.trim(),
+        genero: form.querySelector(`[name="jogador-genero-${index}"]`).value
+      }));
+
+      try {
+        mensagemEdicao.textContent = "Atualizando inscrição...";
+
+        await atualizarInscricao(inscricaoId, {
+          nomeEquipe: form.querySelector('[name="nomeEquipe"]').value.trim(),
+          responsavel: form.querySelector('[name="responsavel"]').value.trim(),
+          contato: form.querySelector('[name="contato"]').value.trim() || null,
+          jogadores
+        });
+
+        inscricaoEmEdicaoId = null;
+        await carregarResumo(false);
+        mensagemCampeonato.textContent = "Inscrição atualizada com sucesso.";
+      } catch (error) {
+        mensagemEdicao.textContent = `Erro: ${error.message}`;
+      }
+    });
+  });
+}
+
+function conectarEventosCancelarEdicaoInscricao() {
+  const botoes = document.querySelectorAll("[data-cancelar-edicao-id]");
+
+  botoes.forEach((botao) => {
+    botao.addEventListener("click", () => {
+      inscricaoEmEdicaoId = null;
+      renderizarParticipantes(resumoAtual.participantes);
+      mensagemCampeonato.textContent = "Edição cancelada.";
+    });
+  });
+}
+
 function conectarEventosExclusaoInscricao() {
   const botoes = document.querySelectorAll("[data-inscricao-id]");
 
@@ -319,6 +710,81 @@ function conectarEventosExclusaoInscricao() {
       }
     });
   });
+}
+
+function agruparJogosPorColunaMataMata(jogos) {
+  const grupos = {
+    "Primeira fase": jogos.filter((jogo) => jogo.fase === "PRIMEIRA_FASE"),
+    "Semifinais": jogos.filter(
+      (jogo) => jogo.fase === "SEMIFINAL_1" || jogo.fase === "SEMIFINAL_2"
+    ),
+    "Final": jogos.filter((jogo) => jogo.fase === "FINAL"),
+    "3º Lugar": jogos.filter((jogo) => jogo.fase === "TERCEIRO_LUGAR")
+  };
+
+  return Object.entries(grupos).filter(([, lista]) => lista.length > 0);
+}
+
+function renderizarChaveMataMata(jogos) {
+  const colunas = agruparJogosPorColunaMataMata(jogos);
+
+  if (!colunas.length) {
+    chaveCampeonato.innerHTML = "<p>Nenhum jogo gerado ainda.</p>";
+    return;
+  }
+
+  chaveCampeonato.innerHTML = `
+    <div class="chave-grid">
+      ${colunas
+        .map(
+          ([titulo, lista]) => `
+            <div class="coluna-chave">
+              <h3>${titulo}</h3>
+              ${lista
+                .map((jogo) => {
+                  const equipeA = jogo.equipeA?.nomeEquipe || "A definir";
+                  const equipeB = jogo.equipeB?.nomeEquipe || "A definir";
+                  const vencedorId = jogo.vencedorId;
+
+                  return `
+                    <div class="jogo-chave">
+                      <div class="fase-status">${jogo.status}</div>
+
+                      <div class="linha-equipe ${
+                        jogo.equipeAId && vencedorId === jogo.equipeAId
+                          ? "vencedor-chave"
+                          : ""
+                      }">
+                        ${equipeA}
+                      </div>
+
+                      <div class="linha-equipe ${
+                        jogo.equipeBId && vencedorId === jogo.equipeBId
+                          ? "vencedor-chave"
+                          : ""
+                      }">
+                        ${equipeB}
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("")}
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderizarChave(resumo) {
+  if (resumo.campeonato.formato !== "MATA_MATA") {
+    chaveCampeonato.innerHTML =
+      "<p>A visualização de chave para este formato será adicionada em breve.</p>";
+    return;
+  }
+
+  renderizarChaveMataMata(resumo.jogos);
 }
 
 function renderizarJogos(jogos) {
@@ -462,6 +928,7 @@ async function carregarResumo(limparMensagemPrincipal = true) {
 
     renderizarResumo(resumo);
     renderizarParticipantes(resumo.participantes);
+    renderizarChave(resumo);
     renderizarJogos(resumo.jogos);
     renderizarPodio(resumo.podio);
     atualizarEstadoBotoes(resumo);
@@ -485,6 +952,17 @@ botaoEncerrar.addEventListener("click", async () => {
     mensagemCampeonato.textContent = "Inscrições encerradas com sucesso.";
   } catch (error) {
     mensagemCampeonato.textContent = `Erro ao encerrar inscrições: ${error.message}`;
+  }
+});
+
+botaoReabrir.addEventListener("click", async () => {
+  try {
+    mensagemCampeonato.textContent = "Reabrindo inscrições...";
+    await reabrirInscricoes(campeonatoId);
+    await carregarResumo(false);
+    mensagemCampeonato.textContent = "Inscrições reabertas com sucesso.";
+  } catch (error) {
+    mensagemCampeonato.textContent = `Erro ao reabrir inscrições: ${error.message}`;
   }
 });
 

@@ -1,4 +1,4 @@
-import { cadastrarOrganizador, loginOrganizador } from "./api.js";
+import { loginAdmin } from "./api.js";
 
 const abaLogin = document.getElementById("aba-login");
 const abaCadastro = document.getElementById("aba-cadastro");
@@ -8,64 +8,42 @@ const mensagemAuth = document.getElementById("mensagem-auth");
 
 function mostrarLogin() {
   formLogin.classList.remove("oculto");
-  formCadastro.classList.add("oculto");
+
+  if (formCadastro) {
+    formCadastro.classList.add("oculto");
+  }
 
   abaLogin.classList.remove("secundario");
   abaLogin.classList.add("aba-ativa");
 
-  abaCadastro.classList.add("secundario");
-  abaCadastro.classList.remove("aba-ativa");
-
-  mensagemAuth.textContent = "";
-}
-
-function mostrarCadastro() {
-  formCadastro.classList.remove("oculto");
-  formLogin.classList.add("oculto");
-
-  abaCadastro.classList.remove("secundario");
-  abaCadastro.classList.add("aba-ativa");
-
-  abaLogin.classList.add("secundario");
-  abaLogin.classList.remove("aba-ativa");
+  if (abaCadastro) {
+    abaCadastro.classList.add("secundario");
+    abaCadastro.classList.remove("aba-ativa");
+    abaCadastro.style.display = "none";
+  }
 
   mensagemAuth.textContent = "";
 }
 
 function salvarSessao(resultadoLogin) {
-  localStorage.setItem("tokenOrganizador", resultadoLogin.token);
+  localStorage.setItem("tokenAdmin", resultadoLogin.token);
   localStorage.setItem(
-    "organizadorLogado",
-    JSON.stringify(resultadoLogin.organizador)
+    "adminLogado",
+    JSON.stringify(resultadoLogin.admin)
   );
 }
 
-abaLogin.addEventListener("click", mostrarLogin);
-abaCadastro.addEventListener("click", mostrarCadastro);
+if (abaLogin) {
+  abaLogin.addEventListener("click", mostrarLogin);
+}
 
-formCadastro.addEventListener("submit", async (event) => {
-  event.preventDefault();
+if (abaCadastro) {
+  abaCadastro.style.display = "none";
+}
 
-  mensagemAuth.textContent = "Cadastrando organizador...";
-
-  const formData = new FormData(formCadastro);
-
-  const dados = {
-    nome: formData.get("nome"),
-    email: formData.get("email"),
-    senha: formData.get("senha")
-  };
-
-  try {
-    await cadastrarOrganizador(dados);
-    mensagemAuth.textContent =
-      "Cadastro realizado com sucesso. Agora faça login.";
-    formCadastro.reset();
-    mostrarLogin();
-  } catch (error) {
-    mensagemAuth.textContent = `Erro no cadastro: ${error.message}`;
-  }
-});
+if (formCadastro) {
+  formCadastro.style.display = "none";
+}
 
 formLogin.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -80,7 +58,7 @@ formLogin.addEventListener("submit", async (event) => {
   };
 
   try {
-    const resultado = await loginOrganizador(dados);
+    const resultado = await loginAdmin(dados);
     salvarSessao(resultado);
     mensagemAuth.textContent = "Login realizado com sucesso.";
     window.location.href = "./inicio.html";

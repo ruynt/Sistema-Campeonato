@@ -11,14 +11,44 @@ async function inscrever(req, res) {
       });
     }
 
-    const participante = await inscricaoServico.inscrever(id, {
+    const participante = await inscricaoServico.inscrever(
+      id,
+      {
+        nomeEquipe,
+        responsavel,
+        contato,
+        jogadores
+      },
+      req.usuario.id
+    );
+
+    return res.status(201).json(participante);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function atualizar(req, res) {
+  try {
+    const { id } = req.params;
+    const { nomeEquipe, responsavel, contato, jogadores } = req.body;
+
+    if (!nomeEquipe || !responsavel || !jogadores || !Array.isArray(jogadores) || !jogadores.length) {
+      return res.status(400).json({
+        erro: "nomeEquipe, responsavel e jogadores são obrigatórios."
+      });
+    }
+
+    const inscricao = await inscricaoServico.atualizar(id, {
       nomeEquipe,
       responsavel,
       contato,
       jogadores
     });
 
-    return res.status(201).json(participante);
+    return res.json(inscricao);
   } catch (error) {
     return res.status(400).json({
       erro: error.message
@@ -57,5 +87,6 @@ async function excluir(req, res) {
 export default {
   inscrever,
   listarPorCampeonato,
+  atualizar,
   excluir
 };

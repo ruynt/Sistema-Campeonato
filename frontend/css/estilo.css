@@ -456,6 +456,157 @@ body {
   margin-bottom: 20px;
 }
 
+.chave-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.coluna-chave {
+  display: grid;
+  gap: 12px;
+}
+
+.coluna-chave h3 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.jogo-chave {
+  border: 1px solid #dbe2ea;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.jogo-chave .fase-status {
+  font-size: 0.9rem;
+  color: #4b5563;
+  margin-bottom: 8px;
+}
+
+.jogo-chave .linha-equipe {
+  padding: 6px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.jogo-chave .linha-equipe:last-child {
+  border-bottom: none;
+}
+
+.vencedor-chave {
+  font-weight: bold;
+  color: #166534;
+}
+
+.rodape-publico {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.link-admin-discreto {
+  font-size: 0.95rem;
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.link-admin-discreto:hover {
+  text-decoration: underline;
+  color: #374151;
+}
+
+.area-edicao-inscricao {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.area-edicao-inscricao h4 {
+  margin-bottom: 12px;
+}
+
+.formulario-edicao-inscricao {
+  display: grid;
+  gap: 14px;
+}
+
+.bloco-jogadores-edicao {
+  display: grid;
+  gap: 12px;
+}
+
+.formulario-edicao-inscricao .card-jogador h4 {
+  margin-bottom: 10px;
+}
+
+.botao-pequeno.secundario {
+  background: #6b7280;
+}
+
+.botao-pequeno.secundario:hover {
+  background: #4b5563;
+}
+
+.area-edicao-inscricao {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.area-edicao-inscricao h4 {
+  margin-bottom: 12px;
+}
+
+.formulario-edicao-inscricao {
+  display: grid;
+  gap: 14px;
+}
+
+.bloco-jogadores-edicao {
+  display: grid;
+  gap: 12px;
+}
+
+.formulario-edicao-inscricao .card-jogador h4 {
+  margin-bottom: 10px;
+}
+
+.botao-pequeno.secundario {
+  background: #6b7280;
+}
+
+.botao-pequeno.secundario:hover {
+  background: #4b5563;
+}
+
+.mensagem-edicao-inscricao {
+  margin-top: 8px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.area-edicao-campeonato {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.area-edicao-campeonato h4 {
+  margin-bottom: 12px;
+}
+
+.formulario-edicao-campeonato {
+  display: grid;
+  gap: 14px;
+}
+
 @media (max-width: 900px) {
   .barra-filtros-publicos {
     grid-template-columns: 1fr 1fr;

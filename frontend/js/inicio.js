@@ -18,8 +18,8 @@ const linkLogin = document.getElementById("link-login");
 
 let campeonatosComResumo = [];
 
-function obterOrganizadorLogado() {
-  const dados = localStorage.getItem("organizadorLogado");
+function obterAdminLogado() {
+  const dados = localStorage.getItem("adminLogado");
   return dados ? JSON.parse(dados) : null;
 }
 
@@ -28,8 +28,8 @@ function estaAutenticado() {
 }
 
 function sair() {
-  localStorage.removeItem("tokenOrganizador");
-  localStorage.removeItem("organizadorLogado");
+  localStorage.removeItem("tokenAdmin");
+  localStorage.removeItem("adminLogado");
   window.location.href = "./login.html";
 }
 
@@ -40,16 +40,16 @@ function protegerPagina() {
 }
 
 function configurarSessao() {
-  const organizador = obterOrganizadorLogado();
+  const admin = obterAdminLogado();
 
-  if (!organizador) {
-    usuarioLogadoBox.innerHTML = "<p>Nenhum organizador autenticado.</p>";
+  if (!admin) {
+    usuarioLogadoBox.innerHTML = "<p>Nenhum administrador autenticado.</p>";
     return;
   }
 
   usuarioLogadoBox.innerHTML = `
-    <p><strong>Organizador logado:</strong> ${organizador.nome}</p>
-    <p><strong>E-mail:</strong> ${organizador.email}</p>
+    <p><strong>Administrador logado:</strong> ${admin.nome}</p>
+    <p><strong>E-mail:</strong> ${admin.email}</p>
   `;
 
   linkLogin.style.display = "none";
@@ -76,6 +76,25 @@ function traduzirStatus(status) {
   };
 
   return mapa[status] || status;
+}
+
+function traduzirTipoParticipante(tipo) {
+  const mapa = {
+    DUPLA: "Dupla",
+    TIME: "Quarteto"
+  };
+
+  return mapa[tipo] || tipo;
+}
+
+function traduzirFormato(formato) {
+  const mapa = {
+    MATA_MATA: "Mata-mata",
+    DUPLA_ELIMINACAO: "Upper/Lower",
+    TODOS_CONTRA_TODOS: "Todos contra todos"
+  };
+
+  return mapa[formato] || formato;
 }
 
 function classeStatusCampeonato(status) {
@@ -121,8 +140,9 @@ function renderizarCampeonatos(campeonatos) {
           <p><strong>ID:</strong> ${campeonato.id}</p>
           <p><strong>Data:</strong> ${formatarData(campeonato.data)}</p>
           <p><strong>Local:</strong> ${formatarTexto(campeonato.local)}</p>
-          <p><strong>Tipo:</strong> ${campeonato.tipoParticipante}</p>
+          <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
           <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
+          <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
           <p><strong>Quantidade máxima:</strong> ${
             campeonato.quantidadeMaxima ?? "Não definida"
           }</p>
@@ -228,6 +248,7 @@ formCampeonato.addEventListener("submit", async (event) => {
     local: formData.get("local") || null,
     tipoParticipante: formData.get("tipoParticipante"),
     categoria: formData.get("categoria"),
+    formato: formData.get("formato"),
     quantidadeMaxima: formData.get("quantidadeMaxima")
       ? Number(formData.get("quantidadeMaxima"))
       : null

@@ -1,15 +1,15 @@
 import { Router } from "express";
 import campeonatoControlador from "../controladores/campeonato.controlador.js";
-import { autenticar } from "../middlewares/autenticacao.middleware.js";
-import { verificarDonoCampeonato } from "../middlewares/autorizacao.middleware.js";
+import { autenticarAdmin } from "../middlewares/autenticacaoAdmin.middleware.js";
 
 const router = Router();
 
-router.post("/", autenticar, campeonatoControlador.criar);
+router.post("/", autenticarAdmin, campeonatoControlador.criar);
 router.get("/", campeonatoControlador.listar);
-router.get("/meus", autenticar, campeonatoControlador.listarMeus);
+router.get("/meus", autenticarAdmin, campeonatoControlador.listarMeus);
 router.get("/publicos", campeonatoControlador.listarPublicos);
 router.get("/:id", campeonatoControlador.buscarPorId);
-router.delete("/:id", autenticar, verificarDonoCampeonato, campeonatoControlador.excluir);
+router.put("/:id", autenticarAdmin, campeonatoControlador.atualizar);
+router.delete("/:id", autenticarAdmin, campeonatoControlador.excluir);
 
 export default router;

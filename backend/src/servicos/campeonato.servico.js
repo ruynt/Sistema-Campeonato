@@ -7,8 +7,8 @@ async function criar(dados) {
     local,
     tipoParticipante,
     categoria,
-    quantidadeMaxima,
-    organizadorId
+    formato,
+    quantidadeMaxima
   } = dados;
 
   const campeonato = await prisma.campeonato.create({
@@ -18,8 +18,8 @@ async function criar(dados) {
       local: local || null,
       tipoParticipante,
       categoria,
-      quantidadeMaxima: quantidadeMaxima ? Number(quantidadeMaxima) : null,
-      organizadorId
+      formato: formato || "MATA_MATA",
+      quantidadeMaxima: quantidadeMaxima ? Number(quantidadeMaxima) : null
     }
   });
 
@@ -36,56 +36,8 @@ async function listar() {
   return campeonatos;
 }
 
-async function buscarPorId(id) {
-  const campeonato = await prisma.campeonato.findUnique({
-    where: {
-      id: Number(id)
-    },
-    include: {
-      participantes: {
-        include: {
-          jogadores: true
-        }
-      },
-      jogos: {
-        include: {
-          equipeA: true,
-          equipeB: true,
-          vencedor: true,
-          sets: true
-        }
-      }
-    }
-  });
-
-  return campeonato;
-}
-
-async function excluir(id) {
-  const campeonato = await prisma.campeonato.findUnique({
-    where: {
-      id: Number(id)
-    }
-  });
-
-  if (!campeonato) {
-    throw new Error("Campeonato não encontrado.");
-  }
-
-  await prisma.campeonato.delete({
-    where: {
-      id: Number(id)
-    }
-  });
-
-  return { mensagem: "Campeonato excluído com sucesso." };
-}
-
-async function listarPorOrganizador(organizadorId) {
+async function listarPorOrganizador() {
   const campeonatos = await prisma.campeonato.findMany({
-    where: {
-      organizadorId: Number(organizadorId)
-    },
     orderBy: {
       criadoEm: "desc"
     }
@@ -144,6 +96,7 @@ async function listarPublicos() {
       local: campeonato.local,
       tipoParticipante: campeonato.tipoParticipante,
       categoria: campeonato.categoria,
+      formato: campeonato.formato,
       quantidadeMaxima: campeonato.quantidadeMaxima,
       inscricoesAbertas: campeonato.inscricoesAbertas,
       criadoEm: campeonato.criadoEm,
@@ -157,11 +110,120 @@ async function listarPublicos() {
   });
 }
 
+async function buscarPorId(id) {
+  const campeonato = await prisma.campeonato.findUnique({
+    where: {
+      id: Number(id)
+    },
+    include: {
+      participantes: {
+        include: {
+          jogadores: true
+        }
+      },
+      jogos: {
+        include: {
+          equipeA: true,
+          equipeB: true,
+          vencedor: true,
+          sets: true
+        }
+      }
+    }
+  });
+
+  return campeonato;
+}
+
+async function atualizar(id, dados) {
+  const {
+    nome,
+    data,
+    local,
+    tipoParticipante,
+    categoria,
+    formato,
+    quantidadeMaxima
+  } = dados;
+
+  const campeonato = await prisma.campeonato.findUnique({
+    where: {
+      id: Number(id)
+    },
+    include: {
+      jogos: true
+    }
+  });
+
+  if (!campeonato) {
+    throw new Error("Campeonato não encontrado.");
+  }
+
+  if (campeonato.jogos.length > 0) {
+    throw new Error("Não é permitido editar o campeonato após o chaveamento ter sido gerado.");
+  }
+
+  const totalInscritos = await prisma.participante.count({
+    where: {
+      campeonatoId: Number(id)
+    }
+  });
+
+  if (
+    quantidadeMaxima !== null &&
+    quantidadeMaxima !== undefined &&
+    quantidadeMaxima !== "" &&
+    Number(quantidadeMaxima) < totalInscritos
+  ) {
+    throw new Error(
+      `A quantidade máxima não pode ser menor que o total atual de inscritos (${totalInscritos}).`
+    );
+  }
+
+  const campeonatoAtualizado = await prisma.campeonato.update({
+    where: {
+      id: Number(id)
+    },
+    data: {
+      nome,
+      data: data ? new Date(data) : null,
+      local: local || null,
+      tipoParticipante,
+      categoria,
+      formato: formato || "MATA_MATA",
+      quantidadeMaxima: quantidadeMaxima ? Number(quantidadeMaxima) : null
+    }
+  });
+
+  return campeonatoAtualizado;
+}
+
+async function excluir(id) {
+  const campeonato = await prisma.campeonato.findUnique({
+    where: {
+      id: Number(id)
+    }
+  });
+
+  if (!campeonato) {
+    throw new Error("Campeonato não encontrado.");
+  }
+
+  await prisma.campeonato.delete({
+    where: {
+      id: Number(id)
+    }
+  });
+
+  return { mensagem: "Campeonato excluído com sucesso." };
+}
+
 export default {
   criar,
   listar,
   listarPorOrganizador,
   listarPublicos,
   buscarPorId,
+  atualizar,
   excluir
 };

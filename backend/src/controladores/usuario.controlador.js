@@ -1,6 +1,6 @@
-import authServico from "../servicos/auth.servico.js";
+import usuarioServico from "../servicos/usuario.servico.js";
 
-async function cadastrar(req, res) {
+async function cadastro(req, res) {
   try {
     const { nome, email, senha } = req.body;
 
@@ -10,13 +10,13 @@ async function cadastrar(req, res) {
       });
     }
 
-    const organizador = await authServico.cadastrar({
+    const usuario = await usuarioServico.cadastrarParticipante({
       nome,
       email,
       senha
     });
 
-    return res.status(201).json(organizador);
+    return res.status(201).json(usuario);
   } catch (error) {
     return res.status(400).json({
       erro: error.message
@@ -34,7 +34,7 @@ async function login(req, res) {
       });
     }
 
-    const resultado = await authServico.login({
+    const resultado = await usuarioServico.loginUsuario({
       email,
       senha
     });
@@ -47,7 +47,19 @@ async function login(req, res) {
   }
 }
 
+async function minhasInscricoes(req, res) {
+  try {
+    const inscricoes = await usuarioServico.listarMinhasInscricoes(req.usuario.id);
+    return res.json(inscricoes);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
 export default {
-  cadastrar,
-  login
+  cadastro,
+  login,
+  minhasInscricoes
 };

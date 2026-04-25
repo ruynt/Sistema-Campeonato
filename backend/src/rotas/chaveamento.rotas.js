@@ -1,12 +1,12 @@
 import { Router } from "express";
 import chaveamentoControlador from "../controladores/chaveamento.controlador.js";
-import { autenticar } from "../middlewares/autenticacao.middleware.js";
-import { verificarDonoCampeonato } from "../middlewares/autorizacao.middleware.js";
+import { autenticarAdmin } from "../middlewares/autenticacaoAdmin.middleware.js";
 
 const router = Router();
 
-router.patch("/:id/encerrar-inscricoes", autenticar, verificarDonoCampeonato, chaveamentoControlador.encerrarInscricoes);
-router.post("/:id/chaveamento", autenticar, verificarDonoCampeonato, chaveamentoControlador.gerarChaveamento);
+router.patch("/:id/encerrar-inscricoes", autenticarAdmin, chaveamentoControlador.encerrarInscricoes);
+router.patch("/:id/reabrir-inscricoes", autenticarAdmin, chaveamentoControlador.reabrirInscricoes);
+router.post("/:id/chaveamento", autenticarAdmin, chaveamentoControlador.gerarChaveamento);
 router.get("/:id/jogos", chaveamentoControlador.listarJogos);
-
+router.patch("/:id/reabrir-inscricoes", autenticarAdmin, chaveamentoControlador.reabrirInscricoes);
 export default router;
