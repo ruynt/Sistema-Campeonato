@@ -2,7 +2,13 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../banco/prisma.js";
 
-async function cadastrarParticipante({ nome, email, senha }) {
+async function cadastrarParticipante({
+  nome,
+  email,
+  contato,
+  senha,
+  dataNascimento
+}) {
   const usuarioExistente = await prisma.usuario.findUnique({
     where: { email }
   });
@@ -17,6 +23,8 @@ async function cadastrarParticipante({ nome, email, senha }) {
     data: {
       nome,
       email,
+      contato,
+      dataNascimento: new Date(dataNascimento),
       senhaHash,
       papel: "PARTICIPANTE"
     }
@@ -26,6 +34,9 @@ async function cadastrarParticipante({ nome, email, senha }) {
     id: usuario.id,
     nome: usuario.nome,
     email: usuario.email,
+    contato: usuario.contato,
+    dataNascimento: usuario.dataNascimento,
+    fotoPerfil: usuario.fotoPerfil,
     papel: usuario.papel
   };
 }
@@ -61,6 +72,9 @@ async function loginUsuario({ email, senha }) {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
+      contato: usuario.contato,
+      dataNascimento: usuario.dataNascimento,
+      fotoPerfil: usuario.fotoPerfil,
       papel: usuario.papel
     }
   };
@@ -81,8 +95,105 @@ async function listarMinhasInscricoes(usuarioId) {
   });
 }
 
+async function buscarPerfil(usuarioId) {
+  const usuario = await prisma.usuario.findUnique({
+    where: {
+      id: Number(usuarioId)
+    },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      contato: true,
+      dataNascimento: true,
+      fotoPerfil: true,
+      papel: true,
+      criadoEm: true
+    }
+  });
+
+  if (!usuario) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  return usuario;
+}
+
+async function atualizarFotoPerfil(usuarioId, nomeArquivo) {
+  const usuario = await prisma.usuario.findUnique({
+    where: {
+      id: Number(usuarioId)
+    }
+  });
+
+  if (!usuario) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  const fotoPerfil = `/uploads/perfis/${nomeArquivo}`;
+
+  const usuarioAtualizado = await prisma.usuario.update({
+    where: {
+      id: Number(usuarioId)
+    },
+    data: {
+      fotoPerfil
+    },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      contato: true,
+      dataNascimento: true,
+      fotoPerfil: true,
+      papel: true,
+      criadoEm: true
+    }
+  });
+
+  return usuarioAtualizado;
+}
+
+async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento }) {
+  const usuario = await prisma.usuario.findUnique({
+    where: {
+      id: Number(usuarioId)
+    }
+  });
+
+  if (!usuario) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  const usuarioAtualizado = await prisma.usuario.update({
+    where: {
+      id: Number(usuarioId)
+    },
+    data: {
+      nome,
+      contato,
+      dataNascimento: new Date(dataNascimento)
+    },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      contato: true,
+      dataNascimento: true,
+      fotoPerfil: true,
+      papel: true,
+      criadoEm: true
+    }
+  });
+
+  return usuarioAtualizado;
+}
+
 export default {
   cadastrarParticipante,
   loginUsuario,
-  listarMinhasInscricoes
+  listarMinhasInscricoes,
+  buscarPerfil,
+  atualizarPerfil,
+  atualizarFotoPerfil
 };

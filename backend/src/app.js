@@ -1,16 +1,19 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 import campeonatoRotas from "./rotas/campeonato.rotas.js";
 import inscricaoRotas from "./rotas/inscricao.rotas.js";
 import chaveamentoRotas from "./rotas/chaveamento.rotas.js";
 import placarRotas from "./rotas/placar.rotas.js";
 import podioRotas from "./rotas/podio.rotas.js";
 import resumoRotas from "./rotas/resumo.rotas.js";
+import usuarioRotas from "./rotas/usuario.rotas.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.resolve("uploads")));
 
 app.get("/", (req, res) => {
   res.json({
@@ -18,6 +21,7 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/usuarios", usuarioRotas);
 app.use("/campeonatos", campeonatoRotas);
 app.use("/campeonatos", inscricaoRotas);
 app.use("/campeonatos", chaveamentoRotas);

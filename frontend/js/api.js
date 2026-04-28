@@ -178,6 +178,58 @@ async function atualizarInscricao(inscricaoId, dadosInscricao) {
   });
 }
 
+async function buscarPerfilParticipante() {
+  const tokenParticipante = localStorage.getItem("tokenParticipante");
+
+  return fazerRequisicao("/usuarios/perfil", {
+    method: "GET",
+    headers: tokenParticipante
+      ? { Authorization: `Bearer ${tokenParticipante}` }
+      : {},
+    usarTokenAdmin: false
+  });
+}
+
+async function atualizarFotoPerfilParticipante(arquivo) {
+  const tokenParticipante = localStorage.getItem("tokenParticipante");
+
+  if (!arquivo) {
+    throw new Error("Nenhum arquivo selecionado.");
+  }
+
+  const formData = new FormData();
+  formData.append("foto", arquivo);
+
+  const resposta = await fetch(`${URL_BASE}/usuarios/perfil/foto`, {
+    method: "PATCH",
+    headers: tokenParticipante
+      ? { Authorization: `Bearer ${tokenParticipante}` }
+      : {},
+    body: formData
+  });
+
+  const dados = await resposta.json();
+
+  if (!resposta.ok) {
+    throw new Error(dados.erro || dados.detalhe || "Erro no upload da foto.");
+  }
+
+  return dados;
+}
+
+async function atualizarPerfilParticipante(dados) {
+  const tokenParticipante = localStorage.getItem("tokenParticipante");
+
+  return fazerRequisicao("/usuarios/perfil", {
+    method: "PUT",
+    headers: tokenParticipante
+      ? { Authorization: `Bearer ${tokenParticipante}` }
+      : {},
+    body: JSON.stringify(dados),
+    usarTokenAdmin: false
+  });
+}
+
 export {
   loginAdmin,
   cadastrarParticipante,
@@ -199,5 +251,8 @@ export {
   excluirCampeonato,
   atualizarInscricao,
   atualizarCampeonato,
+  buscarPerfilParticipante,
+  atualizarPerfilParticipante,
+  atualizarFotoPerfilParticipante,
   obterToken
 };

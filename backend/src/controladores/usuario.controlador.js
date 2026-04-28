@@ -2,18 +2,20 @@ import usuarioServico from "../servicos/usuario.servico.js";
 
 async function cadastro(req, res) {
   try {
-    const { nome, email, senha } = req.body;
+    const { nome, email, contato, senha, dataNascimento } = req.body;
 
-    if (!nome || !email || !senha) {
+    if (!nome || !email || !contato || !senha || !dataNascimento) {
       return res.status(400).json({
-        erro: "Nome, e-mail e senha são obrigatórios."
+        erro: "Nome, e-mail, contato, senha e data de nascimento são obrigatórios."
       });
     }
 
     const usuario = await usuarioServico.cadastrarParticipante({
       nome,
       email,
-      senha
+      contato,
+      senha,
+      dataNascimento
     });
 
     return res.status(201).json(usuario);
@@ -58,8 +60,67 @@ async function minhasInscricoes(req, res) {
   }
 }
 
+async function perfil(req, res) {
+  try {
+    const usuario = await usuarioServico.buscarPerfil(req.usuario.id);
+    return res.json(usuario);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function atualizarFotoPerfil(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        erro: "Nenhuma imagem enviada."
+      });
+    }
+
+    const usuario = await usuarioServico.atualizarFotoPerfil(
+      req.usuario.id,
+      req.file.filename
+    );
+
+    return res.json(usuario);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function atualizarPerfil(req, res) {
+  try {
+    const { nome, contato, dataNascimento } = req.body;
+
+    if (!nome || !contato || !dataNascimento) {
+      return res.status(400).json({
+        erro: "Nome, contato e data de nascimento são obrigatórios."
+      });
+    }
+
+    const usuario = await usuarioServico.atualizarPerfil(req.usuario.id, {
+      nome,
+      contato,
+      dataNascimento
+    });
+
+    return res.json(usuario);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
 export default {
   cadastro,
   login,
-  minhasInscricoes
+  minhasInscricoes,
+  perfil,
+  atualizarPerfil,
+  atualizarFotoPerfil
 };

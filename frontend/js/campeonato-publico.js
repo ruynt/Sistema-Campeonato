@@ -12,7 +12,7 @@ const mensagemCampeonatoPublico = document.getElementById("mensagem-campeonato-p
 const participanteLogadoBox = document.getElementById("participante-logado-box");
 const botaoLogoutParticipante = document.getElementById("botao-logout-participante");
 const linkParticipante = document.getElementById("link-participante");
-const linkMinhasInscricoes = document.getElementById("link-minhas-inscricoes");
+const linkMeuPerfil = document.getElementById("link-meu-perfil");
 
 function obterParticipanteLogado() {
   const dados = localStorage.getItem("participanteLogado");
@@ -31,7 +31,7 @@ function configurarSessaoParticipante() {
     participanteLogadoBox.classList.add("oculto");
     botaoLogoutParticipante.classList.add("oculto");
     linkParticipante.classList.remove("oculto");
-    linkMinhasInscricoes.classList.add("oculto");
+    linkMeuPerfil.classList.add("oculto");
     return;
   }
 
@@ -43,7 +43,7 @@ function configurarSessaoParticipante() {
   participanteLogadoBox.classList.remove("oculto");
   botaoLogoutParticipante.classList.remove("oculto");
   linkParticipante.classList.add("oculto");
-  linkMinhasInscricoes.classList.remove("oculto");
+  linkMeuPerfil.classList.remove("oculto");
 }
 
 function sairParticipante() {
@@ -85,25 +85,10 @@ function traduzirFase(fase) {
     SEMIFINAL_2: "Semifinal 2",
     FINAL: "Final",
     TERCEIRO_LUGAR: "3º Lugar",
-    PRIMEIRA_FASE_1: "Primeira fase 1",
-    PRIMEIRA_FASE_2: "Primeira fase 2",
-    PRIMEIRA_FASE_3: "Primeira fase 3",
-    PRIMEIRA_FASE_4: "Primeira fase 4",
-    QUARTAS_1: "Quartas 1",
-    QUARTAS_2: "Quartas 2",
-    QUARTAS_3: "Quartas 3",
-    QUARTAS_4: "Quartas 4",
-    OITAVAS_1: "Oitavas 1",
-    OITAVAS_2: "Oitavas 2",
-    OITAVAS_3: "Oitavas 3",
-    OITAVAS_4: "Oitavas 4",
-    OITAVAS_5: "Oitavas 5",
-    OITAVAS_6: "Oitavas 6",
-    OITAVAS_7: "Oitavas 7",
-    OITAVAS_8: "Oitavas 8"
+    PRIMEIRA_FASE: "Primeira Fase"
   };
 
-  return mapa[fase] || fase.replaceAll("_", " ");
+  return mapa[fase] || fase;
 }
 
 function traduzirStatusCampeonato(status) {
@@ -126,33 +111,6 @@ function classeStatusCampeonato(status) {
   };
 
   return mapa[status] || "status-aguardando";
-}
-
-function obterBaseFase(fase) {
-  if (fase === "FINAL") return "FINAL";
-  if (fase === "TERCEIRO_LUGAR") return "TERCEIRO_LUGAR";
-  if (fase.startsWith("PRIMEIRA_FASE")) return "PRIMEIRA_FASE";
-  if (fase.startsWith("OITAVAS")) return "OITAVAS";
-  if (fase.startsWith("QUARTAS")) return "QUARTAS";
-  if (fase.startsWith("SEMIFINAL")) return "SEMIFINAL";
-
-  const match = fase.match(/^(.*)_\d+$/);
-  if (match) return match[1];
-
-  return fase;
-}
-
-function obterTituloGrupoFase(baseFase) {
-  const mapa = {
-    PRIMEIRA_FASE: "Primeira fase",
-    OITAVAS: "Oitavas",
-    QUARTAS: "Quartas de final",
-    SEMIFINAL: "Semifinais",
-    FINAL: "Final",
-    TERCEIRO_LUGAR: "3º Lugar"
-  };
-
-  return mapa[baseFase] || baseFase.replaceAll("_", " ");
 }
 
 function renderizarResumo(resumo) {
@@ -218,36 +176,16 @@ function renderizarParticipantes(participantes) {
 }
 
 function agruparJogosPorColunaMataMata(jogos) {
-  const grupos = new Map();
+  const grupos = {
+    "Primeira fase": jogos.filter((jogo) => jogo.fase === "PRIMEIRA_FASE"),
+    "Semifinais": jogos.filter(
+      (jogo) => jogo.fase === "SEMIFINAL_1" || jogo.fase === "SEMIFINAL_2"
+    ),
+    "Final": jogos.filter((jogo) => jogo.fase === "FINAL"),
+    "3º Lugar": jogos.filter((jogo) => jogo.fase === "TERCEIRO_LUGAR")
+  };
 
-  jogos.forEach((jogo) => {
-    const baseFase = obterBaseFase(jogo.fase);
-
-    if (!grupos.has(baseFase)) {
-      grupos.set(baseFase, []);
-    }
-
-    grupos.get(baseFase).push(jogo);
-  });
-
-  const ordem = [
-    "PRIMEIRA_FASE",
-    "OITAVAS",
-    "QUARTAS",
-    "SEMIFINAL",
-    "FINAL",
-    "TERCEIRO_LUGAR"
-  ];
-
-  return Array.from(grupos.entries()).sort((a, b) => {
-    const indiceA = ordem.indexOf(a[0]);
-    const indiceB = ordem.indexOf(b[0]);
-
-    const valorA = indiceA === -1 ? 999 : indiceA;
-    const valorB = indiceB === -1 ? 999 : indiceB;
-
-    return valorA - valorB;
-  });
+  return Object.entries(grupos).filter(([, lista]) => lista.length > 0);
 }
 
 function renderizarChaveMataMata(jogos) {
@@ -262,9 +200,9 @@ function renderizarChaveMataMata(jogos) {
     <div class="chave-grid">
       ${colunas
         .map(
-          ([baseFase, lista]) => `
+          ([titulo, lista]) => `
             <div class="coluna-chave">
-              <h3>${obterTituloGrupoFase(baseFase)}</h3>
+              <h3>${titulo}</h3>
               ${lista
                 .map((jogo) => {
                   const equipeA = jogo.equipeA?.nomeEquipe || "A definir";

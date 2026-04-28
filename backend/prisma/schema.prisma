@@ -41,14 +41,17 @@ enum PapelUsuario {
 }
 
 model Usuario {
-  id         Int          @id @default(autoincrement())
-  nome       String
-  email      String       @unique
-  senhaHash  String
-  papel      PapelUsuario
-  criadoEm   DateTime     @default(now())
+  id             Int             @id @default(autoincrement())
+  nome           String
+  email          String          @unique
+  contato        String?
+  dataNascimento DateTime?
+  fotoPerfil     String?
+  senhaHash      String
+  papel          PapelUsuario
+  criadoEm       DateTime        @default(now())
 
-  inscricoes Participante[]
+  inscricoes     Participante[]
 }
 
 model Campeonato {

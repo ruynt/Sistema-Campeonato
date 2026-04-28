@@ -5,6 +5,25 @@ const abaCadastroParticipante = document.getElementById("aba-cadastro-participan
 const formLoginParticipante = document.getElementById("form-login-participante");
 const formCadastroParticipante = document.getElementById("form-cadastro-participante");
 const mensagemParticipante = document.getElementById("mensagem-participante");
+const campoCadastroContato = document.getElementById("cadastro-participante-contato");
+
+function aplicarMascaraTelefone(valor) {
+  const numeros = valor.replace(/\D/g, "").slice(0, 11);
+
+  if (numeros.length <= 10) {
+    return numeros
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d)/, "$1-$2");
+  }
+
+  return numeros
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d)/, "$1-$2");
+}
+
+function somenteNumeros(valor) {
+  return valor.replace(/\D/g, "");
+}
 
 function mostrarLoginParticipante() {
   formLoginParticipante.classList.remove("oculto");
@@ -40,6 +59,12 @@ function salvarSessaoParticipante(resultadoLogin) {
   );
 }
 
+if (campoCadastroContato) {
+  campoCadastroContato.addEventListener("input", (event) => {
+    event.target.value = aplicarMascaraTelefone(event.target.value);
+  });
+}
+
 abaLoginParticipante.addEventListener("click", mostrarLoginParticipante);
 abaCadastroParticipante.addEventListener("click", mostrarCadastroParticipante);
 
@@ -51,9 +76,11 @@ formCadastroParticipante.addEventListener("submit", async (event) => {
   const formData = new FormData(formCadastroParticipante);
 
   const dados = {
-    nome: formData.get("nome"),
-    email: formData.get("email"),
-    senha: formData.get("senha")
+    nome: formData.get("nome")?.toString().trim(),
+    email: formData.get("email")?.toString().trim(),
+    contato: somenteNumeros(formData.get("contato")?.toString().trim() || ""),
+    dataNascimento: formData.get("dataNascimento")?.toString(),
+    senha: formData.get("senha")?.toString()
   };
 
   try {
@@ -75,8 +102,8 @@ formLoginParticipante.addEventListener("submit", async (event) => {
   const formData = new FormData(formLoginParticipante);
 
   const dados = {
-    email: formData.get("email"),
-    senha: formData.get("senha")
+    email: formData.get("email")?.toString().trim(),
+    senha: formData.get("senha")?.toString()
   };
 
   try {

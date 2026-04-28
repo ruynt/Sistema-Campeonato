@@ -8,7 +8,7 @@ const filtroTipoPublico = document.getElementById("filtro-tipo-publico");
 const participanteLogadoBox = document.getElementById("participante-logado-box");
 const botaoLogoutParticipante = document.getElementById("botao-logout-participante");
 const linkParticipante = document.getElementById("link-participante");
-const linkMinhasInscricoes = document.getElementById("link-minhas-inscricoes");
+const linkMeuPerfil = document.getElementById("link-meu-perfil");
 
 let campeonatos = [];
 
@@ -29,7 +29,7 @@ function configurarSessaoParticipante() {
     participanteLogadoBox.classList.add("oculto");
     botaoLogoutParticipante.classList.add("oculto");
     linkParticipante.classList.remove("oculto");
-    linkMinhasInscricoes.classList.add("oculto");
+    linkMeuPerfil.classList.add("oculto");
     return;
   }
 
@@ -41,7 +41,7 @@ function configurarSessaoParticipante() {
   participanteLogadoBox.classList.remove("oculto");
   botaoLogoutParticipante.classList.remove("oculto");
   linkParticipante.classList.add("oculto");
-  linkMinhasInscricoes.classList.remove("oculto");
+  linkMeuPerfil.classList.remove("oculto");
 }
 
 function sairParticipante() {
