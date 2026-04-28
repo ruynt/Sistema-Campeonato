@@ -1,5 +1,36 @@
 import campeonatoServico from "../servicos/campeonato.servico.js";
 
+const TIPOS_VALIDOS = ["DUPLA", "TIME"];
+
+const CATEGORIAS_VALIDAS = ["MASCULINO", "FEMININO", "MISTA"];
+
+const FORMATOS_VALIDOS = [
+  "MATA_MATA",
+  "DUPLA_ELIMINACAO",
+  "TODOS_CONTRA_TODOS",
+  "GRUPOS_3X4_REPESCAGEM"
+];
+
+function validarDadosCampeonato({ nome, tipoParticipante, categoria, formato }) {
+  if (!nome || !tipoParticipante || !categoria) {
+    return "Nome, tipoParticipante e categoria são obrigatórios.";
+  }
+
+  if (!TIPOS_VALIDOS.includes(tipoParticipante)) {
+    return "tipoParticipante inválido. Use DUPLA ou TIME.";
+  }
+
+  if (!CATEGORIAS_VALIDAS.includes(categoria)) {
+    return "categoria inválida. Use MASCULINO, FEMININO ou MISTA.";
+  }
+
+  if (formato && !FORMATOS_VALIDOS.includes(formato)) {
+    return "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO, TODOS_CONTRA_TODOS ou GRUPOS_3X4_REPESCAGEM.";
+  }
+
+  return null;
+}
+
 async function criar(req, res) {
   try {
     const {
@@ -12,31 +43,16 @@ async function criar(req, res) {
       quantidadeMaxima
     } = req.body;
 
-    if (!nome || !tipoParticipante || !categoria) {
-      return res.status(400).json({
-        erro: "Nome, tipoParticipante e categoria são obrigatórios."
-      });
-    }
+    const erroValidacao = validarDadosCampeonato({
+      nome,
+      tipoParticipante,
+      categoria,
+      formato
+    });
 
-    const tiposValidos = ["DUPLA", "TIME"];
-    const categoriasValidas = ["MASCULINO", "FEMININO", "MISTA"];
-    const formatosValidos = ["MATA_MATA", "DUPLA_ELIMINACAO", "TODOS_CONTRA_TODOS"];
-
-    if (!tiposValidos.includes(tipoParticipante)) {
+    if (erroValidacao) {
       return res.status(400).json({
-        erro: "tipoParticipante inválido. Use DUPLA ou TIME."
-      });
-    }
-
-    if (!categoriasValidas.includes(categoria)) {
-      return res.status(400).json({
-        erro: "categoria inválida. Use MASCULINO, FEMININO ou MISTA."
-      });
-    }
-
-    if (formato && !formatosValidos.includes(formato)) {
-      return res.status(400).json({
-        erro: "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO ou TODOS_CONTRA_TODOS."
+        erro: erroValidacao
       });
     }
 
@@ -143,31 +159,16 @@ async function atualizar(req, res) {
       quantidadeMaxima
     } = req.body;
 
-    if (!nome || !tipoParticipante || !categoria) {
-      return res.status(400).json({
-        erro: "Nome, tipoParticipante e categoria são obrigatórios."
-      });
-    }
+    const erroValidacao = validarDadosCampeonato({
+      nome,
+      tipoParticipante,
+      categoria,
+      formato
+    });
 
-    const tiposValidos = ["DUPLA", "TIME"];
-    const categoriasValidas = ["MASCULINO", "FEMININO", "MISTA"];
-    const formatosValidos = ["MATA_MATA", "DUPLA_ELIMINACAO", "TODOS_CONTRA_TODOS"];
-
-    if (!tiposValidos.includes(tipoParticipante)) {
+    if (erroValidacao) {
       return res.status(400).json({
-        erro: "tipoParticipante inválido. Use DUPLA ou TIME."
-      });
-    }
-
-    if (!categoriasValidas.includes(categoria)) {
-      return res.status(400).json({
-        erro: "categoria inválida. Use MASCULINO, FEMININO ou MISTA."
-      });
-    }
-
-    if (formato && !formatosValidos.includes(formato)) {
-      return res.status(400).json({
-        erro: "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO ou TODOS_CONTRA_TODOS."
+        erro: erroValidacao
       });
     }
 

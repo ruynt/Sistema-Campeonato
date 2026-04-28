@@ -9,7 +9,8 @@ async function registrarPlacar(jogoId, setsInformados) {
     include: {
       sets: true,
       equipeA: true,
-      equipeB: true
+      equipeB: true,
+      campeonato: true
     }
   });
 

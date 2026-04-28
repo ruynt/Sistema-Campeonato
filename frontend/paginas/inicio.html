@@ -63,6 +63,7 @@
           <label for="formato">Formato</label>
           <select id="formato" name="formato" required>
             <option value="MATA_MATA">Mata-mata</option>
+            <option value="GRUPOS_3X4_REPESCAGEM">Fase de grupos + repescagem + mata-mata</option>
             <option value="DUPLA_ELIMINACAO">Upper/Lower (em breve)</option>
             <option value="TODOS_CONTRA_TODOS">Todos contra todos (em breve)</option>
           </select>
@@ -70,10 +71,19 @@
 
         <div class="grupo-formulario">
           <label for="quantidadeMaxima">Quantidade máxima</label>
-          <input type="number" id="quantidadeMaxima" name="quantidadeMaxima" min="2" />
+          <input
+            type="number"
+            id="quantidadeMaxima"
+            name="quantidadeMaxima"
+            min="2"
+            placeholder="Ex: 12"
+          />
+          <small class="texto-ajuda">
+            No formato com grupos + repescagem, a quantidade será definida como 12.
+          </small>
         </div>
 
-        <button type="submit" class="botao">Criar campeonato</button>
+        <button type="submit" class="botao botao-criar-campeonato">Criar campeonato</button>
       </form>
 
       <p id="mensagem" class="mensagem"></p>

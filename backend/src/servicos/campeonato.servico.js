@@ -1,5 +1,46 @@
 import { prisma } from "../banco/prisma.js";
 
+const FORMATOS_VALIDOS = [
+  "MATA_MATA",
+  "DUPLA_ELIMINACAO",
+  "TODOS_CONTRA_TODOS",
+  "GRUPOS_3X4_REPESCAGEM"
+];
+
+function validarFormatoCampeonato(formato) {
+  if (!formato) {
+    return "MATA_MATA";
+  }
+
+  if (!FORMATOS_VALIDOS.includes(formato)) {
+    throw new Error("Formato de campeonato inválido.");
+  }
+
+  return formato;
+}
+
+function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
+  if (formato === "GRUPOS_3X4_REPESCAGEM") {
+    return 12;
+  }
+
+  if (
+    quantidadeMaxima === null ||
+    quantidadeMaxima === undefined ||
+    quantidadeMaxima === ""
+  ) {
+    return null;
+  }
+
+  const quantidade = Number(quantidadeMaxima);
+
+  if (Number.isNaN(quantidade) || quantidade < 2) {
+    throw new Error("A quantidade máxima precisa ser um número maior ou igual a 2.");
+  }
+
+  return quantidade;
+}
+
 async function criar(dados) {
   const {
     nome,
@@ -11,6 +52,12 @@ async function criar(dados) {
     quantidadeMaxima
   } = dados;
 
+  const formatoValidado = validarFormatoCampeonato(formato);
+  const quantidadeMaximaTratada = prepararQuantidadeMaxima(
+    formatoValidado,
+    quantidadeMaxima
+  );
+
   const campeonato = await prisma.campeonato.create({
     data: {
       nome,
@@ -18,8 +65,8 @@ async function criar(dados) {
       local: local || null,
       tipoParticipante,
       categoria,
-      formato: formato || "MATA_MATA",
-      quantidadeMaxima: quantidadeMaxima ? Number(quantidadeMaxima) : null
+      formato: formatoValidado,
+      quantidadeMaxima: quantidadeMaximaTratada
     }
   });
 
@@ -163,6 +210,12 @@ async function atualizar(id, dados) {
     throw new Error("Não é permitido editar o campeonato após o chaveamento ter sido gerado.");
   }
 
+  const formatoValidado = validarFormatoCampeonato(formato);
+  const quantidadeMaximaTratada = prepararQuantidadeMaxima(
+    formatoValidado,
+    quantidadeMaxima
+  );
+
   const totalInscritos = await prisma.participante.count({
     where: {
       campeonatoId: Number(id)
@@ -170,10 +223,9 @@ async function atualizar(id, dados) {
   });
 
   if (
-    quantidadeMaxima !== null &&
-    quantidadeMaxima !== undefined &&
-    quantidadeMaxima !== "" &&
-    Number(quantidadeMaxima) < totalInscritos
+    quantidadeMaximaTratada !== null &&
+    quantidadeMaximaTratada !== undefined &&
+    quantidadeMaximaTratada < totalInscritos
   ) {
     throw new Error(
       `A quantidade máxima não pode ser menor que o total atual de inscritos (${totalInscritos}).`
@@ -190,8 +242,8 @@ async function atualizar(id, dados) {
       local: local || null,
       tipoParticipante,
       categoria,
-      formato: formato || "MATA_MATA",
-      quantidadeMaxima: quantidadeMaxima ? Number(quantidadeMaxima) : null
+      formato: formatoValidado,
+      quantidadeMaxima: quantidadeMaximaTratada
     }
   });
 

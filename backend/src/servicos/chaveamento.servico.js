@@ -36,6 +36,14 @@ function obterBaseDaFase(fase) {
     return fase;
   }
 
+  if (fase === "REPESCAGEM") {
+    return "REPESCAGEM";
+  }
+
+  if (fase.startsWith("FASE_GRUPOS")) {
+    return "FASE_GRUPOS";
+  }
+
   if (fase.startsWith("PRIMEIRA_FASE")) {
     return "PRIMEIRA_FASE";
   }
@@ -71,7 +79,8 @@ async function criarJogosDaFase(campeonatoId, baseFase, equipes) {
         fase: "FINAL",
         campeonatoId: Number(campeonatoId),
         equipeAId: equipes[0].id,
-        equipeBId: equipes[1].id
+        equipeBId: equipes[1].id,
+        ordem: 1
       }
     });
 
@@ -93,13 +102,396 @@ async function criarJogosDaFase(campeonatoId, baseFase, equipes) {
       fase,
       campeonatoId: Number(campeonatoId),
       equipeAId: equipes[i].id,
-      equipeBId: equipes[i + 1].id
+      equipeBId: equipes[i + 1].id,
+      ordem: numeroJogo
     });
   }
 
   await prisma.jogo.createMany({
     data: jogos
   });
+}
+
+function montarJogosGrupo(campeonatoId, grupo, equipes) {
+  return [
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 1,
+      ordem: 1,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[0].id,
+      equipeBId: equipes[3].id
+    },
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 1,
+      ordem: 2,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[1].id,
+      equipeBId: equipes[2].id
+    },
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 2,
+      ordem: 3,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[0].id,
+      equipeBId: equipes[2].id
+    },
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 2,
+      ordem: 4,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[3].id,
+      equipeBId: equipes[1].id
+    },
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 3,
+      ordem: 5,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[0].id,
+      equipeBId: equipes[1].id
+    },
+    {
+      fase: "FASE_GRUPOS",
+      grupo,
+      rodada: 3,
+      ordem: 6,
+      campeonatoId: Number(campeonatoId),
+      equipeAId: equipes[2].id,
+      equipeBId: equipes[3].id
+    }
+  ];
+}
+
+async function gerarFaseDeGruposComRepescagem(campeonatoId, participantes) {
+  if (participantes.length !== 12) {
+    throw new Error(
+      "O formato Fase de grupos + repescagem + mata-mata precisa ter exatamente 12 participantes aprovados."
+    );
+  }
+
+  const participantesEmbaralhados = embaralharLista(participantes);
+
+  const grupoA = participantesEmbaralhados.slice(0, 4);
+  const grupoB = participantesEmbaralhados.slice(4, 8);
+  const grupoC = participantesEmbaralhados.slice(8, 12);
+
+  const jogos = [
+    ...montarJogosGrupo(campeonatoId, "A", grupoA),
+    ...montarJogosGrupo(campeonatoId, "B", grupoB),
+    ...montarJogosGrupo(campeonatoId, "C", grupoC)
+  ];
+
+  await prisma.jogo.createMany({
+    data: jogos
+  });
+}
+
+function criarTabelaGrupo(jogosDoGrupo) {
+  const tabela = new Map();
+
+  function garantirEquipe(equipe) {
+    if (!equipe) {
+      return;
+    }
+
+    if (!tabela.has(equipe.id)) {
+      tabela.set(equipe.id, {
+        participante: equipe,
+        jogos: 0,
+        vitorias: 0,
+        derrotas: 0,
+        setsPro: 0,
+        setsContra: 0,
+        pontosPro: 0,
+        pontosContra: 0,
+        saldoSets: 0,
+        saldoPontos: 0
+      });
+    }
+  }
+
+  jogosDoGrupo.forEach((jogo) => {
+    garantirEquipe(jogo.equipeA);
+    garantirEquipe(jogo.equipeB);
+
+    const equipeA = tabela.get(jogo.equipeAId);
+    const equipeB = tabela.get(jogo.equipeBId);
+
+    equipeA.jogos += 1;
+    equipeB.jogos += 1;
+
+    if (jogo.vencedorId === jogo.equipeAId) {
+      equipeA.vitorias += 1;
+      equipeB.derrotas += 1;
+    }
+
+    if (jogo.vencedorId === jogo.equipeBId) {
+      equipeB.vitorias += 1;
+      equipeA.derrotas += 1;
+    }
+
+    jogo.sets.forEach((set) => {
+      equipeA.pontosPro += set.pontosA;
+      equipeA.pontosContra += set.pontosB;
+
+      equipeB.pontosPro += set.pontosB;
+      equipeB.pontosContra += set.pontosA;
+
+      if (set.pontosA > set.pontosB) {
+        equipeA.setsPro += 1;
+        equipeA.setsContra += 0;
+        equipeB.setsPro += 0;
+        equipeB.setsContra += 1;
+      }
+
+      if (set.pontosB > set.pontosA) {
+        equipeB.setsPro += 1;
+        equipeB.setsContra += 0;
+        equipeA.setsPro += 0;
+        equipeA.setsContra += 1;
+      }
+    });
+  });
+
+  const classificados = Array.from(tabela.values()).map((item) => ({
+    ...item,
+    saldoSets: item.setsPro - item.setsContra,
+    saldoPontos: item.pontosPro - item.pontosContra
+  }));
+
+  classificados.sort((a, b) => {
+    if (b.vitorias !== a.vitorias) {
+      return b.vitorias - a.vitorias;
+    }
+
+    if (b.saldoSets !== a.saldoSets) {
+      return b.saldoSets - a.saldoSets;
+    }
+
+    if (b.saldoPontos !== a.saldoPontos) {
+      return b.saldoPontos - a.saldoPontos;
+    }
+
+    const confrontoDireto = jogosDoGrupo.find((jogo) => {
+      const envolveA =
+        jogo.equipeAId === a.participante.id || jogo.equipeBId === a.participante.id;
+
+      const envolveB =
+        jogo.equipeAId === b.participante.id || jogo.equipeBId === b.participante.id;
+
+      return envolveA && envolveB && jogo.vencedorId;
+    });
+
+    if (confrontoDireto) {
+      if (confrontoDireto.vencedorId === a.participante.id) {
+        return -1;
+      }
+
+      if (confrontoDireto.vencedorId === b.participante.id) {
+        return 1;
+      }
+    }
+
+    return Math.random() - 0.5;
+  });
+
+  return classificados;
+}
+
+function montarClassificacaoDosGrupos(jogos) {
+  const jogosFaseGrupos = jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS");
+
+  const grupos = {
+    A: jogosFaseGrupos.filter((jogo) => jogo.grupo === "A"),
+    B: jogosFaseGrupos.filter((jogo) => jogo.grupo === "B"),
+    C: jogosFaseGrupos.filter((jogo) => jogo.grupo === "C")
+  };
+
+  return {
+    A: criarTabelaGrupo(grupos.A),
+    B: criarTabelaGrupo(grupos.B),
+    C: criarTabelaGrupo(grupos.C)
+  };
+}
+
+function faseFoiFinalizada(jogos) {
+  return jogos.every((jogo) => jogo.status === "FINALIZADO" && jogo.vencedorId);
+}
+
+async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
+  const jogos = campeonato.jogos;
+
+  const jogosFaseGrupos = jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS");
+  const jogoRepescagem = jogos.find((jogo) => jogo.fase === "REPESCAGEM");
+  const jogosQuartas = jogos.filter((jogo) => jogo.fase.startsWith("QUARTAS"));
+  const jogosSemifinais = jogos.filter((jogo) => jogo.fase.startsWith("SEMIFINAL"));
+  const jogoFinal = jogos.find((jogo) => jogo.fase === "FINAL");
+
+  if (!jogosFaseGrupos.length) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosFaseGrupos)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  const classificacao = montarClassificacaoDosGrupos(jogos);
+
+  const primeiroA = classificacao.A[0]?.participante;
+  const segundoA = classificacao.A[1]?.participante;
+  const terceiroA = classificacao.A[2];
+
+  const primeiroB = classificacao.B[0]?.participante;
+  const segundoB = classificacao.B[1]?.participante;
+  const terceiroB = classificacao.B[2];
+
+  const primeiroC = classificacao.C[0]?.participante;
+  const segundoC = classificacao.C[1]?.participante;
+  const terceiroC = classificacao.C[2];
+
+  const terceiros = [
+    { grupo: "A", ...terceiroA },
+    { grupo: "B", ...terceiroB },
+    { grupo: "C", ...terceiroC }
+  ];
+
+  terceiros.sort((a, b) => {
+    if (b.vitorias !== a.vitorias) {
+      return b.vitorias - a.vitorias;
+    }
+
+    if (b.saldoSets !== a.saldoSets) {
+      return b.saldoSets - a.saldoSets;
+    }
+
+    if (b.saldoPontos !== a.saldoPontos) {
+      return b.saldoPontos - a.saldoPontos;
+    }
+
+    return Math.random() - 0.5;
+  });
+
+  const melhorTerceiro = terceiros[0]?.participante;
+  const terceirosRepescagem = terceiros.slice(1).map((item) => item.participante);
+
+  if (!jogoRepescagem) {
+    await prisma.jogo.create({
+      data: {
+        fase: "REPESCAGEM",
+        campeonatoId: Number(campeonatoId),
+        equipeAId: terceirosRepescagem[0].id,
+        equipeBId: terceirosRepescagem[1].id,
+        ordem: 1
+      }
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  if (jogoRepescagem.status !== "FINALIZADO" || !jogoRepescagem.vencedorId) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!jogosQuartas.length) {
+    await prisma.jogo.createMany({
+      data: [
+        {
+          fase: "QUARTAS_1",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: primeiroA.id,
+          equipeBId: segundoC.id,
+          ordem: 1
+        },
+        {
+          fase: "QUARTAS_2",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: primeiroB.id,
+          equipeBId: segundoA.id,
+          ordem: 2
+        },
+        {
+          fase: "QUARTAS_3",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: primeiroC.id,
+          equipeBId: segundoB.id,
+          ordem: 3
+        },
+        {
+          fase: "QUARTAS_4",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: melhorTerceiro.id,
+          equipeBId: jogoRepescagem.vencedorId,
+          ordem: 4
+        }
+      ]
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosQuartas)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!jogosSemifinais.length) {
+    const quartas1 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_1");
+    const quartas2 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_2");
+    const quartas3 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_3");
+    const quartas4 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_4");
+
+    await prisma.jogo.createMany({
+      data: [
+        {
+          fase: "SEMIFINAL_1",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: quartas1.vencedorId,
+          equipeBId: quartas4.vencedorId,
+          ordem: 1
+        },
+        {
+          fase: "SEMIFINAL_2",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: quartas2.vencedorId,
+          equipeBId: quartas3.vencedorId,
+          ordem: 2
+        }
+      ]
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosSemifinais)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!jogoFinal) {
+    const semifinal1 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_1");
+    const semifinal2 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_2");
+
+    await prisma.jogo.create({
+      data: {
+        fase: "FINAL",
+        campeonatoId: Number(campeonatoId),
+        equipeAId: semifinal1.vencedorId,
+        equipeBId: semifinal2.vencedorId,
+        ordem: 1
+      }
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  return await listarJogos(campeonatoId);
 }
 
 async function encerrarInscricoes(campeonatoId) {
@@ -158,6 +550,11 @@ async function gerarChaveamento(campeonatoId) {
     throw new Error("É preciso ter pelo menos 2 participantes para gerar o chaveamento.");
   }
 
+  if (campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
+    await gerarFaseDeGruposComRepescagem(campeonatoId, participantes);
+    return await listarJogos(campeonatoId);
+  }
+
   const participantesEmbaralhados = embaralharLista(participantes);
   const quantidadeParticipantes = participantesEmbaralhados.length;
   const tamanhoChave = proximaPotenciaDeDois(quantidadeParticipantes);
@@ -206,9 +603,14 @@ async function listarJogos(campeonatoId) {
       vencedor: true,
       sets: true
     },
-    orderBy: {
-      id: "asc"
-    }
+    orderBy: [
+      {
+        criadoEm: "asc"
+      },
+      {
+        id: "asc"
+      }
+    ]
   });
 
   return jogos;
@@ -229,7 +631,8 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
         include: {
           equipeA: true,
           equipeB: true,
-          vencedor: true
+          vencedor: true,
+          sets: true
         },
         orderBy: {
           id: "asc"
@@ -240,6 +643,10 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
 
   if (!campeonato) {
     throw new Error("Campeonato não encontrado.");
+  }
+
+  if (campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
+    return await gerarProximaFaseGruposRepescagem(campeonatoId, campeonato);
   }
 
   const jogos = campeonato.jogos;
@@ -306,13 +713,15 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
             fase: "FINAL",
             campeonatoId: Number(campeonatoId),
             equipeAId: vencedor1.id,
-            equipeBId: vencedor2.id
+            equipeBId: vencedor2.id,
+            ordem: 1
           },
           {
             fase: "TERCEIRO_LUGAR",
             campeonatoId: Number(campeonatoId),
             equipeAId: perdedor1.id,
-            equipeBId: perdedor2.id
+            equipeBId: perdedor2.id,
+            ordem: 1
           }
         ]
       });
@@ -347,7 +756,8 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
           fase: "FINAL",
           campeonatoId: Number(campeonatoId),
           equipeAId: classificados[0].id,
-          equipeBId: classificados[1].id
+          equipeBId: classificados[1].id,
+          ordem: 1
         }
       });
     }

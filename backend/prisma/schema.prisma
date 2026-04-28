@@ -33,6 +33,7 @@ enum FormatoCampeonato {
   MATA_MATA
   DUPLA_ELIMINACAO
   TODOS_CONTRA_TODOS
+  GRUPOS_3X4_REPESCAGEM
 }
 
 enum PapelUsuario {
@@ -105,6 +106,9 @@ model Jogador {
 model Jogo {
   id           Int           @id @default(autoincrement())
   fase         String
+  grupo        String?
+  rodada       Int?
+  ordem        Int?
   status       StatusJogo    @default(PENDENTE)
   criadoEm     DateTime      @default(now())
 

@@ -92,6 +92,7 @@ function traduzirTipoParticipante(tipo) {
 function traduzirFormato(formato) {
   const mapa = {
     MATA_MATA: "Mata-mata",
+    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + repescagem + mata-mata",
     DUPLA_ELIMINACAO: "Upper/Lower",
     TODOS_CONTRA_TODOS: "Todos contra todos"
   };
@@ -101,6 +102,8 @@ function traduzirFormato(formato) {
 
 function traduzirFase(fase) {
   const mapa = {
+    FASE_GRUPOS: "Fase de grupos",
+    REPESCAGEM: "Repescagem",
     SEMIFINAL_1: "Semifinal 1",
     SEMIFINAL_2: "Semifinal 2",
     FINAL: "Final",
@@ -153,12 +156,18 @@ function quantidadeMinimaParaChaveamento() {
 }
 
 function quantidadeValidaParaGerarChaveamento(resumo) {
+  if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
+    return resumo.totais.participantes === 12;
+  }
+
   return resumo.totais.participantes >= quantidadeMinimaParaChaveamento();
 }
 
 function obterBaseFase(fase) {
   if (fase === "FINAL") return "FINAL";
   if (fase === "TERCEIRO_LUGAR") return "TERCEIRO_LUGAR";
+  if (fase === "REPESCAGEM") return "REPESCAGEM";
+  if (fase === "FASE_GRUPOS") return "FASE_GRUPOS";
   if (fase.startsWith("PRIMEIRA_FASE")) return "PRIMEIRA_FASE";
   if (fase.startsWith("OITAVAS")) return "OITAVAS";
   if (fase.startsWith("QUARTAS")) return "QUARTAS";
@@ -172,6 +181,8 @@ function obterBaseFase(fase) {
 
 function obterTituloGrupoFase(baseFase) {
   const mapa = {
+    FASE_GRUPOS: "Fase de grupos",
+    REPESCAGEM: "Repescagem",
     PRIMEIRA_FASE: "Primeira fase",
     OITAVAS: "Oitavas",
     QUARTAS: "Quartas de final",
@@ -192,6 +203,10 @@ function mensagemApoioChaveamento(resumo) {
 
   if (resumo.campeonato.inscricoesAbertas) {
     return "Feche as inscrições antes de gerar o chaveamento.";
+  }
+
+  if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM" && total !== 12) {
+    return `Este formato precisa ter exatamente 12 participantes aprovados. Atualmente há ${total}.`;
   }
 
   if (total < 2) {
@@ -276,6 +291,7 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
           <label>Formato</label>
           <select name="formato" ${possuiInscritos ? "disabled" : ""} required>
             <option value="MATA_MATA" ${campeonato.formato === "MATA_MATA" ? "selected" : ""}>Mata-mata</option>
+            <option value="GRUPOS_3X4_REPESCAGEM" ${campeonato.formato === "GRUPOS_3X4_REPESCAGEM" ? "selected" : ""}>Fase de grupos + repescagem + mata-mata</option>
             <option value="DUPLA_ELIMINACAO" ${campeonato.formato === "DUPLA_ELIMINACAO" ? "selected" : ""}>Upper/Lower</option>
             <option value="TODOS_CONTRA_TODOS" ${campeonato.formato === "TODOS_CONTRA_TODOS" ? "selected" : ""}>Todos contra todos</option>
           </select>
@@ -289,6 +305,9 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
             min="${minimoQuantidade}"
             value="${campeonato.quantidadeMaxima ?? ""}"
           />
+          <small class="texto-ajuda">
+            No formato com grupos + repescagem, a quantidade máxima será definida como 12.
+          </small>
         </div>
 
         <div class="acoes-card">
@@ -604,9 +623,17 @@ function conectarFormularioEdicaoCampeonato() {
     try {
       mensagemEdicao.textContent = "Salvando campeonato...";
 
-      const quantidadeMaximaValor = form.querySelector('[name="quantidadeMaxima"]').value
-        ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
-        : null;
+      const formatoSelecionado =
+        resumoAtual.totais.participantes > 0
+          ? resumoAtual.campeonato.formato
+          : form.querySelector('[name="formato"]').value;
+
+      const quantidadeMaximaValor =
+        formatoSelecionado === "GRUPOS_3X4_REPESCAGEM"
+          ? 12
+          : form.querySelector('[name="quantidadeMaxima"]').value
+            ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
+            : null;
 
       if (
         quantidadeMaximaValor !== null &&
@@ -627,9 +654,7 @@ function conectarFormularioEdicaoCampeonato() {
         categoria: resumoAtual.totais.participantes > 0
           ? resumoAtual.campeonato.categoria
           : form.querySelector('[name="categoria"]').value,
-        formato: resumoAtual.totais.participantes > 0
-          ? resumoAtual.campeonato.formato
-          : form.querySelector('[name="formato"]').value,
+        formato: formatoSelecionado,
         quantidadeMaxima: quantidadeMaximaValor
       });
 
@@ -760,6 +785,8 @@ function agruparJogosPorColunaMataMata(jogos) {
   });
 
   const ordem = [
+    "FASE_GRUPOS",
+    "REPESCAGEM",
     "PRIMEIRA_FASE",
     "OITAVAS",
     "QUARTAS",
@@ -802,7 +829,11 @@ function renderizarChaveMataMata(jogos) {
 
                   return `
                     <div class="jogo-chave">
-                      <div class="fase-status">${jogo.status}</div>
+                      <div class="fase-status">
+                        ${jogo.status}
+                        ${jogo.grupo ? ` • Grupo ${jogo.grupo}` : ""}
+                        ${jogo.rodada ? ` • Rodada ${jogo.rodada}` : ""}
+                      </div>
 
                       <div class="linha-equipe ${
                         jogo.equipeAId && vencedorId === jogo.equipeAId
@@ -832,13 +863,18 @@ function renderizarChaveMataMata(jogos) {
 }
 
 function renderizarChave(resumo) {
-  if (resumo.campeonato.formato !== "MATA_MATA") {
-    chaveCampeonato.innerHTML =
-      "<p>A visualização de chave para este formato será adicionada em breve.</p>";
+  if (resumo.campeonato.formato === "MATA_MATA") {
+    renderizarChaveMataMata(resumo.jogos);
     return;
   }
 
-  renderizarChaveMataMata(resumo.jogos);
+  if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
+    renderizarChaveMataMata(resumo.jogos);
+    return;
+  }
+
+  chaveCampeonato.innerHTML =
+    "<p>A visualização de chave para este formato será adicionada em breve.</p>";
 }
 
 function renderizarJogos(jogos) {
@@ -858,6 +894,19 @@ function renderizarJogos(jogos) {
           return `
             <div class="item-lista">
               <h3>${traduzirFase(jogo.fase)}</h3>
+
+              ${
+                jogo.grupo
+                  ? `<p><strong>Grupo:</strong> ${jogo.grupo}</p>`
+                  : ""
+              }
+
+              ${
+                jogo.rodada
+                  ? `<p><strong>Rodada:</strong> ${jogo.rodada}</p>`
+                  : ""
+              }
+
               <p><strong>Status:</strong> ${jogo.status}</p>
 
               <div class="confronto-visual">

@@ -15,6 +15,8 @@ const filtroStatus = document.getElementById("filtro-status");
 const usuarioLogadoBox = document.getElementById("usuario-logado-box");
 const botaoLogout = document.getElementById("botao-logout");
 const linkLogin = document.getElementById("link-login");
+const campoFormato = document.getElementById("formato");
+const campoQuantidadeMaxima = document.getElementById("quantidadeMaxima");
 
 let campeonatosComResumo = [];
 
@@ -55,6 +57,22 @@ function configurarSessao() {
   linkLogin.style.display = "none";
 }
 
+function configurarQuantidadePorFormato() {
+  if (!campoFormato || !campoQuantidadeMaxima) {
+    return;
+  }
+
+  if (campoFormato.value === "GRUPOS_3X4_REPESCAGEM") {
+    campoQuantidadeMaxima.value = 12;
+    campoQuantidadeMaxima.readOnly = true;
+    campoQuantidadeMaxima.classList.add("campo-bloqueado");
+    return;
+  }
+
+  campoQuantidadeMaxima.readOnly = false;
+  campoQuantidadeMaxima.classList.remove("campo-bloqueado");
+}
+
 function formatarTexto(valor) {
   return valor || "Não informado";
 }
@@ -90,6 +108,7 @@ function traduzirTipoParticipante(tipo) {
 function traduzirFormato(formato) {
   const mapa = {
     MATA_MATA: "Mata-mata",
+    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + repescagem + mata-mata",
     DUPLA_ELIMINACAO: "Upper/Lower",
     TODOS_CONTRA_TODOS: "Todos contra todos"
   };
@@ -241,6 +260,7 @@ formCampeonato.addEventListener("submit", async (event) => {
   mensagem.textContent = "Criando campeonato...";
 
   const formData = new FormData(formCampeonato);
+  const formatoSelecionado = formData.get("formato");
 
   const dadosCampeonato = {
     nome: formData.get("nome"),
@@ -248,16 +268,20 @@ formCampeonato.addEventListener("submit", async (event) => {
     local: formData.get("local") || null,
     tipoParticipante: formData.get("tipoParticipante"),
     categoria: formData.get("categoria"),
-    formato: formData.get("formato"),
-    quantidadeMaxima: formData.get("quantidadeMaxima")
-      ? Number(formData.get("quantidadeMaxima"))
-      : null
+    formato: formatoSelecionado,
+    quantidadeMaxima:
+      formatoSelecionado === "GRUPOS_3X4_REPESCAGEM"
+        ? 12
+        : formData.get("quantidadeMaxima")
+          ? Number(formData.get("quantidadeMaxima"))
+          : null
   };
 
   try {
     await criarCampeonato(dadosCampeonato);
     mensagem.textContent = "Campeonato criado com sucesso.";
     formCampeonato.reset();
+    configurarQuantidadePorFormato();
     await carregarCampeonatos();
   } catch (error) {
     mensagem.textContent = `Erro ao criar campeonato: ${error.message}`;
@@ -269,6 +293,11 @@ buscaCampeonato.addEventListener("input", atualizarListaComFiltros);
 filtroStatus.addEventListener("change", atualizarListaComFiltros);
 botaoLogout.addEventListener("click", sair);
 
+if (campoFormato) {
+  campoFormato.addEventListener("change", configurarQuantidadePorFormato);
+}
+
 protegerPagina();
 configurarSessao();
+configurarQuantidadePorFormato();
 carregarCampeonatos();
