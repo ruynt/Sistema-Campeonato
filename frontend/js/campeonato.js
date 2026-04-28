@@ -538,6 +538,8 @@ function montarSetsExistentes(jogo) {
   return `
     <ul>
       ${jogo.sets
+        .slice()
+        .sort((a, b) => a.numeroSet - b.numeroSet)
         .map(
           (set) =>
             `<li>Set ${set.numeroSet}: ${set.pontosA} x ${set.pontosB}</li>`
@@ -552,11 +554,66 @@ function montarFormularioPlacar(jogo) {
     return "";
   }
 
+  if (jogo.fase === "FINAL") {
+    return `
+      <form class="formulario-placar" data-jogo-id="${jogo.id}" data-fase="${jogo.fase}">
+        <p class="info-auxiliar">
+          Final em melhor de 3 sets. Se uma equipe vencer os dois primeiros sets, o 3º set não precisa ser preenchido.
+        </p>
+
+        <div class="grade-sets">
+          <div class="linha-set">
+            <strong>Set 1</strong>
+            <div>
+              <label>Pontos equipe A</label>
+              <input type="number" name="set1a" min="0" required />
+            </div>
+            <div>
+              <label>Pontos equipe B</label>
+              <input type="number" name="set1b" min="0" required />
+            </div>
+          </div>
+
+          <div class="linha-set">
+            <strong>Set 2</strong>
+            <div>
+              <label>Pontos equipe A</label>
+              <input type="number" name="set2a" min="0" required />
+            </div>
+            <div>
+              <label>Pontos equipe B</label>
+              <input type="number" name="set2b" min="0" required />
+            </div>
+          </div>
+
+          <div class="linha-set">
+            <strong>Set 3</strong>
+            <div>
+              <label>Pontos equipe A</label>
+              <input type="number" name="set3a" min="0" />
+            </div>
+            <div>
+              <label>Pontos equipe B</label>
+              <input type="number" name="set3b" min="0" />
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="botao-pequeno">Salvar placar</button>
+        <p class="mensagem-jogo" id="mensagem-jogo-${jogo.id}"></p>
+      </form>
+    `;
+  }
+
   return `
-    <form class="formulario-placar" data-jogo-id="${jogo.id}">
+    <form class="formulario-placar" data-jogo-id="${jogo.id}" data-fase="${jogo.fase}">
+      <p class="info-auxiliar">
+        Este jogo será decidido em set único.
+      </p>
+
       <div class="grade-sets">
         <div class="linha-set">
-          <strong>Set 1</strong>
+          <strong>Set único</strong>
           <div>
             <label>Pontos equipe A</label>
             <input type="number" name="set1a" min="0" required />
@@ -564,30 +621,6 @@ function montarFormularioPlacar(jogo) {
           <div>
             <label>Pontos equipe B</label>
             <input type="number" name="set1b" min="0" required />
-          </div>
-        </div>
-
-        <div class="linha-set">
-          <strong>Set 2</strong>
-          <div>
-            <label>Pontos equipe A</label>
-            <input type="number" name="set2a" min="0" required />
-          </div>
-          <div>
-            <label>Pontos equipe B</label>
-            <input type="number" name="set2b" min="0" required />
-          </div>
-        </div>
-
-        <div class="linha-set">
-          <strong>Set 3</strong>
-          <div>
-            <label>Pontos equipe A</label>
-            <input type="number" name="set3a" min="0" />
-          </div>
-          <div>
-            <label>Pontos equipe B</label>
-            <input type="number" name="set3b" min="0" />
           </div>
         </div>
       </div>
@@ -806,70 +839,365 @@ function agruparJogosPorColunaMataMata(jogos) {
   });
 }
 
-function renderizarChaveMataMata(jogos) {
-  const colunas = agruparJogosPorColunaMataMata(jogos);
+function ordenarJogos(lista) {
+  return [...lista].sort((a, b) => {
+    const grupoA = a.grupo || "";
+    const grupoB = b.grupo || "";
 
-  if (!colunas.length) {
+    if (grupoA !== grupoB) {
+      return grupoA.localeCompare(grupoB);
+    }
+
+    const rodadaA = a.rodada || 0;
+    const rodadaB = b.rodada || 0;
+
+    if (rodadaA !== rodadaB) {
+      return rodadaA - rodadaB;
+    }
+
+    const ordemA = a.ordem || 0;
+    const ordemB = b.ordem || 0;
+
+    if (ordemA !== ordemB) {
+      return ordemA - ordemB;
+    }
+
+    return (a.id || 0) - (b.id || 0);
+  });
+}
+
+function jogoFoiFinalizado(jogo) {
+  return jogo?.status === "FINALIZADO" && Boolean(jogo?.vencedorId);
+}
+
+function formatarPlacarCurto(jogo) {
+  if (!Array.isArray(jogo.sets) || jogo.sets.length === 0) {
+    return "Sem placar";
+  }
+
+  return jogo.sets
+    .slice()
+    .sort((a, b) => a.numeroSet - b.numeroSet)
+    .map((set) => `${set.pontosA}x${set.pontosB}`)
+    .join(" • ");
+}
+
+function renderizarPlaceholderChave(texto) {
+  return `
+    <div class="jogo-chave placeholder-chave">
+      <p>${texto}</p>
+    </div>
+  `;
+}
+
+function renderizarCardJogoChaveCompacto(jogo, tituloInterno = "") {
+  const equipeA = jogo.equipeA?.nomeEquipe || "A definir";
+  const equipeB = jogo.equipeB?.nomeEquipe || "A definir";
+  const vencedorId = jogo.vencedorId;
+  const placarCurto = formatarPlacarCurto(jogo);
+
+  return `
+    <div class="jogo-chave">
+      ${
+        tituloInterno
+          ? `<div class="titulo-jogo-chave">${tituloInterno}</div>`
+          : ""
+      }
+
+      <div class="fase-status">
+        ${jogo.status}
+        ${jogo.grupo ? ` • Grupo ${jogo.grupo}` : ""}
+        ${jogo.rodada ? ` • Rodada ${jogo.rodada}` : ""}
+      </div>
+
+      <div class="linha-equipe ${
+        jogo.equipeAId && vencedorId === jogo.equipeAId ? "vencedor-chave" : ""
+      }">
+        <span>${equipeA}</span>
+      </div>
+
+      <div class="linha-equipe ${
+        jogo.equipeBId && vencedorId === jogo.equipeBId ? "vencedor-chave" : ""
+      }">
+        <span>${equipeB}</span>
+      </div>
+
+      <div class="placar-chave">${placarCurto}</div>
+    </div>
+  `;
+}
+
+function criarTabelaGrupoFrontend(jogosDoGrupo) {
+  const tabela = new Map();
+
+  function garantirEquipe(equipe) {
+    if (!equipe) return;
+
+    if (!tabela.has(equipe.id)) {
+      tabela.set(equipe.id, {
+        participante: equipe,
+        jogos: 0,
+        vitorias: 0,
+        derrotas: 0,
+        setsPro: 0,
+        setsContra: 0,
+        pontosPro: 0,
+        pontosContra: 0,
+        saldoSets: 0,
+        saldoPontos: 0
+      });
+    }
+  }
+
+  jogosDoGrupo.forEach((jogo) => {
+    garantirEquipe(jogo.equipeA);
+    garantirEquipe(jogo.equipeB);
+
+    if (!jogoFoiFinalizado(jogo)) {
+      return;
+    }
+
+    const equipeA = tabela.get(jogo.equipeAId);
+    const equipeB = tabela.get(jogo.equipeBId);
+
+    if (!equipeA || !equipeB) return;
+
+    equipeA.jogos += 1;
+    equipeB.jogos += 1;
+
+    if (jogo.vencedorId === jogo.equipeAId) {
+      equipeA.vitorias += 1;
+      equipeB.derrotas += 1;
+    }
+
+    if (jogo.vencedorId === jogo.equipeBId) {
+      equipeB.vitorias += 1;
+      equipeA.derrotas += 1;
+    }
+
+    (jogo.sets || []).forEach((set) => {
+      equipeA.pontosPro += set.pontosA;
+      equipeA.pontosContra += set.pontosB;
+
+      equipeB.pontosPro += set.pontosB;
+      equipeB.pontosContra += set.pontosA;
+
+      if (set.pontosA > set.pontosB) {
+        equipeA.setsPro += 1;
+        equipeB.setsContra += 1;
+      }
+
+      if (set.pontosB > set.pontosA) {
+        equipeB.setsPro += 1;
+        equipeA.setsContra += 1;
+      }
+    });
+  });
+
+  const classificados = Array.from(tabela.values()).map((item) => ({
+    ...item,
+    saldoSets: item.setsPro - item.setsContra,
+    saldoPontos: item.pontosPro - item.pontosContra
+  }));
+
+  classificados.sort((a, b) => {
+    if (b.vitorias !== a.vitorias) {
+      return b.vitorias - a.vitorias;
+    }
+
+    if (b.saldoSets !== a.saldoSets) {
+      return b.saldoSets - a.saldoSets;
+    }
+
+    if (b.saldoPontos !== a.saldoPontos) {
+      return b.saldoPontos - a.saldoPontos;
+    }
+
+    const confrontoDireto = jogosDoGrupo.find((jogo) => {
+      if (!jogoFoiFinalizado(jogo)) return false;
+
+      const envolveA =
+        jogo.equipeAId === a.participante.id || jogo.equipeBId === a.participante.id;
+
+      const envolveB =
+        jogo.equipeAId === b.participante.id || jogo.equipeBId === b.participante.id;
+
+      return envolveA && envolveB;
+    });
+
+    if (confrontoDireto) {
+      if (confrontoDireto.vencedorId === a.participante.id) {
+        return -1;
+      }
+
+      if (confrontoDireto.vencedorId === b.participante.id) {
+        return 1;
+      }
+    }
+
+    return a.participante.nomeEquipe.localeCompare(b.participante.nomeEquipe);
+  });
+
+  return classificados;
+}
+
+function renderizarResumoGrupoChave(letraGrupo, jogosDoGrupo) {
+  const tabela = criarTabelaGrupoFrontend(jogosDoGrupo);
+  const jogosFinalizados = jogosDoGrupo.filter(jogoFoiFinalizado).length;
+  const totalJogos = jogosDoGrupo.length;
+
+  return `
+    <div class="jogo-chave resumo-grupo">
+      <div class="grupo-resumo-topo">
+        <strong>Grupo ${letraGrupo}</strong>
+        <span>${jogosFinalizados}/${totalJogos} jogos</span>
+      </div>
+
+      <div class="grupo-classificacao">
+        ${[0, 1, 2, 3]
+          .map(
+            (index) => `
+              <div class="linha-classificacao">
+                <span class="posicao-grupo">${index + 1}º</span>
+                <span class="nome-grupo">${tabela[index]?.participante?.nomeEquipe || "—"}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarColunaChave(titulo, conteudo, temSeta = true) {
+  return `
+    <div class="coluna-chave ${temSeta ? "tem-seta" : ""}">
+      <h3>${titulo}</h3>
+      <div class="cards-coluna-chave">
+        ${conteudo}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarChaveGruposRepescagem(jogos) {
+  const jogosGrupo = ordenarJogos(jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS"));
+  const jogosRepescagem = ordenarJogos(jogos.filter((jogo) => jogo.fase === "REPESCAGEM"));
+  const jogosQuartas = ordenarJogos(
+    jogos.filter((jogo) => obterBaseFase(jogo.fase) === "QUARTAS")
+  );
+  const jogosSemifinais = ordenarJogos(
+    jogos.filter((jogo) => obterBaseFase(jogo.fase) === "SEMIFINAL")
+  );
+  const jogosFinal = ordenarJogos(jogos.filter((jogo) => jogo.fase === "FINAL"));
+  const jogosTerceiro = ordenarJogos(jogos.filter((jogo) => jogo.fase === "TERCEIRO_LUGAR"));
+
+  const jogosGrupoA = jogosGrupo.filter((jogo) => jogo.grupo === "A");
+  const jogosGrupoB = jogosGrupo.filter((jogo) => jogo.grupo === "B");
+  const jogosGrupoC = jogosGrupo.filter((jogo) => jogo.grupo === "C");
+
+  const colunas = [
+    {
+      titulo: "Fase de grupos",
+      html:
+        renderizarResumoGrupoChave("A", jogosGrupoA) +
+        renderizarResumoGrupoChave("B", jogosGrupoB) +
+        renderizarResumoGrupoChave("C", jogosGrupoC)
+    },
+    {
+      titulo: "Repescagem",
+      html: jogosRepescagem.length
+        ? jogosRepescagem.map((jogo) => renderizarCardJogoChaveCompacto(jogo)).join("")
+        : renderizarPlaceholderChave("Aguardando conclusão da fase de grupos.")
+    },
+    {
+      titulo: "Quartas de final",
+      html: jogosQuartas.length
+        ? jogosQuartas.map((jogo) => renderizarCardJogoChaveCompacto(jogo)).join("")
+        : renderizarPlaceholderChave("Quartas ainda não definidas.")
+    },
+    {
+      titulo: "Semifinais",
+      html: jogosSemifinais.length
+        ? jogosSemifinais.map((jogo) => renderizarCardJogoChaveCompacto(jogo)).join("")
+        : renderizarPlaceholderChave("Semifinais ainda não definidas.")
+    },
+    {
+      titulo: "Finais",
+      html:
+        (jogosFinal.length
+          ? jogosFinal.map((jogo) => renderizarCardJogoChaveCompacto(jogo, "Final")).join("")
+          : renderizarPlaceholderChave("Final ainda não definida.")) +
+        (jogosTerceiro.length
+          ? jogosTerceiro
+              .map((jogo) => renderizarCardJogoChaveCompacto(jogo, "3º Lugar"))
+              .join("")
+          : "")
+    }
+  ];
+
+  chaveCampeonato.innerHTML = `
+    <div class="chave-horizontal-wrapper">
+      <div class="chave-horizontal">
+        ${colunas
+          .map((coluna, index) =>
+            renderizarColunaChave(
+              coluna.titulo,
+              coluna.html,
+              index < colunas.length - 1
+            )
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarChavePadrao(jogos) {
+  const colunasOriginais = agruparJogosPorColunaMataMata(jogos);
+
+  if (!colunasOriginais.length) {
     chaveCampeonato.innerHTML = "<p>Nenhum jogo gerado ainda.</p>";
     return;
   }
 
+  const colunas = colunasOriginais.map(([baseFase, lista]) => ({
+    titulo: obterTituloGrupoFase(baseFase),
+    html: ordenarJogos(lista)
+      .map((jogo) => renderizarCardJogoChaveCompacto(jogo))
+      .join("")
+  }));
+
   chaveCampeonato.innerHTML = `
-    <div class="chave-grid">
-      ${colunas
-        .map(
-          ([baseFase, lista]) => `
-            <div class="coluna-chave">
-              <h3>${obterTituloGrupoFase(baseFase)}</h3>
-              ${lista
-                .map((jogo) => {
-                  const equipeA = jogo.equipeA?.nomeEquipe || "A definir";
-                  const equipeB = jogo.equipeB?.nomeEquipe || "A definir";
-                  const vencedorId = jogo.vencedorId;
-
-                  return `
-                    <div class="jogo-chave">
-                      <div class="fase-status">
-                        ${jogo.status}
-                        ${jogo.grupo ? ` • Grupo ${jogo.grupo}` : ""}
-                        ${jogo.rodada ? ` • Rodada ${jogo.rodada}` : ""}
-                      </div>
-
-                      <div class="linha-equipe ${
-                        jogo.equipeAId && vencedorId === jogo.equipeAId
-                          ? "vencedor-chave"
-                          : ""
-                      }">
-                        ${equipeA}
-                      </div>
-
-                      <div class="linha-equipe ${
-                        jogo.equipeBId && vencedorId === jogo.equipeBId
-                          ? "vencedor-chave"
-                          : ""
-                      }">
-                        ${equipeB}
-                      </div>
-                    </div>
-                  `;
-                })
-                .join("")}
-            </div>
-          `
-        )
-        .join("")}
+    <div class="chave-horizontal-wrapper">
+      <div class="chave-horizontal">
+        ${colunas
+          .map((coluna, index) =>
+            renderizarColunaChave(
+              coluna.titulo,
+              coluna.html,
+              index < colunas.length - 1
+            )
+          )
+          .join("")}
+      </div>
     </div>
   `;
 }
 
 function renderizarChave(resumo) {
-  if (resumo.campeonato.formato === "MATA_MATA") {
-    renderizarChaveMataMata(resumo.jogos);
+  if (!resumo.jogos.length) {
+    chaveCampeonato.innerHTML = "<p>Nenhum jogo gerado ainda.</p>";
     return;
   }
 
   if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
-    renderizarChaveMataMata(resumo.jogos);
+    renderizarChaveGruposRepescagem(resumo.jogos);
+    return;
+  }
+
+  if (resumo.campeonato.formato === "MATA_MATA") {
+    renderizarChavePadrao(resumo.jogos);
     return;
   }
 
@@ -883,9 +1211,11 @@ function renderizarJogos(jogos) {
     return;
   }
 
+  const jogosOrdenados = ordenarJogos(jogos);
+
   listaJogos.innerHTML = `
     <div class="lista-simples">
-      ${jogos
+      ${jogosOrdenados
         .map((jogo) => {
           const nomeEquipeA = jogo.equipeA?.nomeEquipe || "A definir";
           const nomeEquipeB = jogo.equipeB?.nomeEquipe || "A definir";
@@ -955,30 +1285,75 @@ function renderizarPodio(dadosPodio) {
   `;
 }
 
-function extrairSetsDoFormulario(form) {
-  const set1a = form.querySelector('[name="set1a"]').value;
-  const set1b = form.querySelector('[name="set1b"]').value;
-  const set2a = form.querySelector('[name="set2a"]').value;
-  const set2b = form.querySelector('[name="set2b"]').value;
-  const set3a = form.querySelector('[name="set3a"]').value;
-  const set3b = form.querySelector('[name="set3b"]').value;
-
-  const sets = [
-    { numeroSet: 1, pontosA: Number(set1a), pontosB: Number(set1b) },
-    { numeroSet: 2, pontosA: Number(set2a), pontosB: Number(set2b) }
-  ];
-
-  const terceiroPreenchido = set3a !== "" && set3b !== "";
-
-  if (terceiroPreenchido) {
-    sets.push({
-      numeroSet: 3,
-      pontosA: Number(set3a),
-      pontosB: Number(set3b)
-    });
+function validarSet(pontosA, pontosB, numeroSet) {
+  if (pontosA === "" || pontosB === "") {
+    throw new Error(`Preencha os pontos do Set ${numeroSet}.`);
   }
 
-  return sets;
+  const pontosANumero = Number(pontosA);
+  const pontosBNumero = Number(pontosB);
+
+  if (Number.isNaN(pontosANumero) || Number.isNaN(pontosBNumero)) {
+    throw new Error(`Os pontos do Set ${numeroSet} precisam ser números válidos.`);
+  }
+
+  if (pontosANumero < 0 || pontosBNumero < 0) {
+    throw new Error(`Os pontos do Set ${numeroSet} não podem ser negativos.`);
+  }
+
+  if (pontosANumero === pontosBNumero) {
+    throw new Error(`O Set ${numeroSet} não pode terminar empatado.`);
+  }
+
+  return {
+    numeroSet,
+    pontosA: pontosANumero,
+    pontosB: pontosBNumero
+  };
+}
+
+function extrairSetsDoFormulario(form) {
+  const fase = form.dataset.fase;
+
+  const set1a = form.querySelector('[name="set1a"]')?.value ?? "";
+  const set1b = form.querySelector('[name="set1b"]')?.value ?? "";
+
+  const set1 = validarSet(set1a, set1b, 1);
+
+  if (fase !== "FINAL") {
+    return [set1];
+  }
+
+  const set2a = form.querySelector('[name="set2a"]')?.value ?? "";
+  const set2b = form.querySelector('[name="set2b"]')?.value ?? "";
+
+  const set2 = validarSet(set2a, set2b, 2);
+
+  let vitoriasEquipeA = 0;
+  let vitoriasEquipeB = 0;
+
+  if (set1.pontosA > set1.pontosB) {
+    vitoriasEquipeA += 1;
+  } else {
+    vitoriasEquipeB += 1;
+  }
+
+  if (set2.pontosA > set2.pontosB) {
+    vitoriasEquipeA += 1;
+  } else {
+    vitoriasEquipeB += 1;
+  }
+
+  if (vitoriasEquipeA === 2 || vitoriasEquipeB === 2) {
+    return [set1, set2];
+  }
+
+  const set3a = form.querySelector('[name="set3a"]')?.value ?? "";
+  const set3b = form.querySelector('[name="set3b"]')?.value ?? "";
+
+  const set3 = validarSet(set3a, set3b, 3);
+
+  return [set1, set2, set3];
 }
 
 function conectarEventosPlacar() {

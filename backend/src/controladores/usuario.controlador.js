@@ -1,12 +1,31 @@
 import usuarioServico from "../servicos/usuario.servico.js";
 
+const SEXOS_VALIDOS = [
+  "MASCULINO",
+  "FEMININO"
+];
+
+function validarSexo(sexo) {
+  if (!sexo) {
+    return false;
+  }
+
+  return SEXOS_VALIDOS.includes(sexo);
+}
+
 async function cadastro(req, res) {
   try {
-    const { nome, email, contato, senha, dataNascimento } = req.body;
+    const { nome, email, contato, senha, dataNascimento, sexo } = req.body;
 
-    if (!nome || !email || !contato || !senha || !dataNascimento) {
+    if (!nome || !email || !contato || !senha || !dataNascimento || !sexo) {
       return res.status(400).json({
-        erro: "Nome, e-mail, contato, senha e data de nascimento são obrigatórios."
+        erro: "Nome, e-mail, contato, data de nascimento, sexo e senha são obrigatórios."
+      });
+    }
+
+    if (!validarSexo(sexo)) {
+      return res.status(400).json({
+        erro: "Sexo inválido. Use MASCULINO ou FEMININO."
       });
     }
 
@@ -15,7 +34,8 @@ async function cadastro(req, res) {
       email,
       contato,
       senha,
-      dataNascimento
+      dataNascimento,
+      sexo
     });
 
     return res.status(201).json(usuario);
@@ -94,18 +114,25 @@ async function atualizarFotoPerfil(req, res) {
 
 async function atualizarPerfil(req, res) {
   try {
-    const { nome, contato, dataNascimento } = req.body;
+    const { nome, contato, dataNascimento, sexo } = req.body;
 
-    if (!nome || !contato || !dataNascimento) {
+    if (!nome || !contato || !dataNascimento || !sexo) {
       return res.status(400).json({
-        erro: "Nome, contato e data de nascimento são obrigatórios."
+        erro: "Nome, contato, data de nascimento e sexo são obrigatórios."
+      });
+    }
+
+    if (!validarSexo(sexo)) {
+      return res.status(400).json({
+        erro: "Sexo inválido. Use MASCULINO ou FEMININO."
       });
     }
 
     const usuario = await usuarioServico.atualizarPerfil(req.usuario.id, {
       nome,
       contato,
-      dataNascimento
+      dataNascimento,
+      sexo
     });
 
     return res.json(usuario);

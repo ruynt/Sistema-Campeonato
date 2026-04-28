@@ -80,6 +80,7 @@ formCadastroParticipante.addEventListener("submit", async (event) => {
     email: formData.get("email")?.toString().trim(),
     contato: somenteNumeros(formData.get("contato")?.toString().trim() || ""),
     dataNascimento: formData.get("dataNascimento")?.toString(),
+    sexo: formData.get("sexo")?.toString() || null,
     senha: formData.get("senha")?.toString()
   };
 

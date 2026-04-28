@@ -41,16 +41,24 @@ enum PapelUsuario {
   PARTICIPANTE
 }
 
+enum SexoUsuario {
+  MASCULINO
+  FEMININO
+  OUTRO
+  PREFIRO_NAO_INFORMAR
+}
+
 model Usuario {
-  id             Int             @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   nome           String
-  email          String          @unique
+  email          String       @unique
   contato        String?
   dataNascimento DateTime?
+  sexo           SexoUsuario?
   fotoPerfil     String?
   senhaHash      String
   papel          PapelUsuario
-  criadoEm       DateTime        @default(now())
+  criadoEm       DateTime     @default(now())
 
   inscricoes     Participante[]
 }

@@ -2,12 +2,39 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../banco/prisma.js";
 
+function montarUsuarioRetorno(usuario) {
+  return {
+    id: usuario.id,
+    nome: usuario.nome,
+    email: usuario.email,
+    contato: usuario.contato,
+    dataNascimento: usuario.dataNascimento,
+    sexo: usuario.sexo,
+    fotoPerfil: usuario.fotoPerfil,
+    papel: usuario.papel,
+    criadoEm: usuario.criadoEm
+  };
+}
+
+const selectUsuarioPublico = {
+  id: true,
+  nome: true,
+  email: true,
+  contato: true,
+  dataNascimento: true,
+  sexo: true,
+  fotoPerfil: true,
+  papel: true,
+  criadoEm: true
+};
+
 async function cadastrarParticipante({
   nome,
   email,
   contato,
   senha,
-  dataNascimento
+  dataNascimento,
+  sexo
 }) {
   const usuarioExistente = await prisma.usuario.findUnique({
     where: { email }
@@ -25,20 +52,13 @@ async function cadastrarParticipante({
       email,
       contato,
       dataNascimento: new Date(dataNascimento),
+      sexo: sexo || null,
       senhaHash,
       papel: "PARTICIPANTE"
     }
   });
 
-  return {
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    contato: usuario.contato,
-    dataNascimento: usuario.dataNascimento,
-    fotoPerfil: usuario.fotoPerfil,
-    papel: usuario.papel
-  };
+  return montarUsuarioRetorno(usuario);
 }
 
 async function loginUsuario({ email, senha }) {
@@ -68,15 +88,7 @@ async function loginUsuario({ email, senha }) {
 
   return {
     token,
-    usuario: {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      contato: usuario.contato,
-      dataNascimento: usuario.dataNascimento,
-      fotoPerfil: usuario.fotoPerfil,
-      papel: usuario.papel
-    }
+    usuario: montarUsuarioRetorno(usuario)
   };
 }
 
@@ -100,16 +112,7 @@ async function buscarPerfil(usuarioId) {
     where: {
       id: Number(usuarioId)
     },
-    select: {
-      id: true,
-      nome: true,
-      email: true,
-      contato: true,
-      dataNascimento: true,
-      fotoPerfil: true,
-      papel: true,
-      criadoEm: true
-    }
+    select: selectUsuarioPublico
   });
 
   if (!usuario) {
@@ -139,22 +142,13 @@ async function atualizarFotoPerfil(usuarioId, nomeArquivo) {
     data: {
       fotoPerfil
     },
-    select: {
-      id: true,
-      nome: true,
-      email: true,
-      contato: true,
-      dataNascimento: true,
-      fotoPerfil: true,
-      papel: true,
-      criadoEm: true
-    }
+    select: selectUsuarioPublico
   });
 
   return usuarioAtualizado;
 }
 
-async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento }) {
+async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento, sexo }) {
   const usuario = await prisma.usuario.findUnique({
     where: {
       id: Number(usuarioId)
@@ -172,18 +166,10 @@ async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento }) {
     data: {
       nome,
       contato,
-      dataNascimento: new Date(dataNascimento)
+      dataNascimento: new Date(dataNascimento),
+      sexo: sexo || null
     },
-    select: {
-      id: true,
-      nome: true,
-      email: true,
-      contato: true,
-      dataNascimento: true,
-      fotoPerfil: true,
-      papel: true,
-      criadoEm: true
-    }
+    select: selectUsuarioPublico
   });
 
   return usuarioAtualizado;

@@ -248,15 +248,11 @@ function criarTabelaGrupo(jogosDoGrupo) {
 
       if (set.pontosA > set.pontosB) {
         equipeA.setsPro += 1;
-        equipeA.setsContra += 0;
-        equipeB.setsPro += 0;
         equipeB.setsContra += 1;
       }
 
       if (set.pontosB > set.pontosA) {
         equipeB.setsPro += 1;
-        equipeB.setsContra += 0;
-        equipeA.setsPro += 0;
         equipeA.setsContra += 1;
       }
     });
@@ -327,6 +323,18 @@ function faseFoiFinalizada(jogos) {
   return jogos.every((jogo) => jogo.status === "FINALIZADO" && jogo.vencedorId);
 }
 
+function obterPerdedorDoJogo(jogo) {
+  if (!jogo || !jogo.vencedorId) {
+    return null;
+  }
+
+  if (jogo.equipeAId === jogo.vencedorId) {
+    return jogo.equipeB;
+  }
+
+  return jogo.equipeA;
+}
+
 async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
   const jogos = campeonato.jogos;
 
@@ -335,6 +343,7 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
   const jogosQuartas = jogos.filter((jogo) => jogo.fase.startsWith("QUARTAS"));
   const jogosSemifinais = jogos.filter((jogo) => jogo.fase.startsWith("SEMIFINAL"));
   const jogoFinal = jogos.find((jogo) => jogo.fase === "FINAL");
+  const jogoTerceiroLugar = jogos.find((jogo) => jogo.fase === "TERCEIRO_LUGAR");
 
   if (!jogosFaseGrupos.length) {
     return await listarJogos(campeonatoId);
@@ -474,19 +483,40 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
     return await listarJogos(campeonatoId);
   }
 
-  if (!jogoFinal) {
+  if (!jogoFinal || !jogoTerceiroLugar) {
     const semifinal1 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_1");
     const semifinal2 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_2");
 
-    await prisma.jogo.create({
-      data: {
+    const perdedorSemifinal1 = obterPerdedorDoJogo(semifinal1);
+    const perdedorSemifinal2 = obterPerdedorDoJogo(semifinal2);
+
+    const jogosParaCriar = [];
+
+    if (!jogoFinal) {
+      jogosParaCriar.push({
         fase: "FINAL",
         campeonatoId: Number(campeonatoId),
         equipeAId: semifinal1.vencedorId,
         equipeBId: semifinal2.vencedorId,
         ordem: 1
-      }
-    });
+      });
+    }
+
+    if (!jogoTerceiroLugar) {
+      jogosParaCriar.push({
+        fase: "TERCEIRO_LUGAR",
+        campeonatoId: Number(campeonatoId),
+        equipeAId: perdedorSemifinal1.id,
+        equipeBId: perdedorSemifinal2.id,
+        ordem: 1
+      });
+    }
+
+    if (jogosParaCriar.length > 0) {
+      await prisma.jogo.createMany({
+        data: jogosParaCriar
+      });
+    }
 
     return await listarJogos(campeonatoId);
   }

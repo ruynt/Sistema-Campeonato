@@ -455,48 +455,175 @@ body {
   flex-wrap: wrap;
 }
 
-.chave-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
-  align-items: start;
+/* NOVA CHAVE HORIZONTAL */
+.chave-horizontal-wrapper {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.chave-horizontal {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  min-width: max-content;
 }
 
 .coluna-chave {
-  display: grid;
+  position: relative;
+  width: 220px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .coluna-chave h3 {
-  font-size: 1rem;
-  margin-bottom: 4px;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  border: 1px solid #dbeafe;
+}
+
+.cards-coluna-chave {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.coluna-chave.tem-seta::after {
+  content: "";
+  position: absolute;
+  top: 52%;
+  right: -18px;
+  width: 18px;
+  height: 2px;
+  background: #cbd5e1;
+}
+
+.coluna-chave.tem-seta::before {
+  content: "";
+  position: absolute;
+  top: calc(52% - 4px);
+  right: -18px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #cbd5e1;
+  border-right: 2px solid #cbd5e1;
+  transform: rotate(45deg);
 }
 
 .jogo-chave {
   border: 1px solid #dbe2ea;
   background: #f9fafb;
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+}
+
+.titulo-jogo-chave {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #1f2937;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .jogo-chave .fase-status {
-  font-size: 0.9rem;
-  color: #4b5563;
+  font-size: 0.76rem;
+  color: #6b7280;
   margin-bottom: 8px;
+  line-height: 1.3;
 }
 
 .jogo-chave .linha-equipe {
-  padding: 6px 0;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
-.jogo-chave .linha-equipe:last-child {
-  border-bottom: none;
+.jogo-chave .linha-equipe:last-of-type {
+  margin-bottom: 0;
 }
 
 .vencedor-chave {
-  font-weight: bold;
+  font-weight: 700 !important;
   color: #166534;
+  background: #dcfce7 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.placar-chave {
+  margin-top: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.placeholder-chave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92px;
+  text-align: center;
+  color: #6b7280;
+  background: #ffffff;
+}
+
+.resumo-grupo {
+  background: #ffffff;
+}
+
+.grupo-resumo-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: #374151;
+}
+
+.grupo-classificacao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linha-classificacao {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.posicao-grupo {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.nome-grupo {
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .rodape-publico {
@@ -632,6 +759,11 @@ body {
   .barra-filtros-publicos {
     grid-template-columns: 1fr 1fr;
   }
+
+  .coluna-chave {
+    width: 210px;
+    min-width: 210px;
+  }
 }
 
 @media (max-width: 700px) {
@@ -664,5 +796,22 @@ body {
   .confronto-visual {
     grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .linha-set {
+    grid-template-columns: 1fr;
+  }
+
+  .linha-set strong {
+    padding-bottom: 0;
+  }
+
+  .chave-horizontal {
+    gap: 16px;
+  }
+
+  .coluna-chave {
+    width: 200px;
+    min-width: 200px;
   }
 }
