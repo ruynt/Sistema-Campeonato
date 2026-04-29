@@ -48,6 +48,18 @@ enum SexoUsuario {
   PREFIRO_NAO_INFORMAR
 }
 
+enum PapelMembroEquipe {
+  DONO
+  MEMBRO
+}
+
+enum StatusConviteEquipe {
+  PENDENTE
+  ACEITO
+  EXPIRADO
+  CANCELADO
+}
+
 model Usuario {
   id             Int          @id @default(autoincrement())
   nome           String
@@ -61,6 +73,54 @@ model Usuario {
   criadoEm       DateTime     @default(now())
 
   inscricoes     Participante[]
+
+  equipesCriadas Equipe[]        @relation("DonoEquipe")
+  equipesMembro  EquipeMembro[]
+  convitesCriados ConviteEquipe[] @relation("ConvitesCriados")
+}
+
+model Equipe {
+  id               Int              @id @default(autoincrement())
+  nome             String
+  tipoParticipante TipoParticipante
+  criadaEm         DateTime         @default(now())
+
+  donoId           Int
+  dono             Usuario          @relation("DonoEquipe", fields: [donoId], references: [id], onDelete: Cascade)
+
+  membros          EquipeMembro[]
+  convites         ConviteEquipe[]
+  inscricoes       Participante[]
+
+  @@unique([donoId, nome])
+}
+
+model EquipeMembro {
+  id        Int              @id @default(autoincrement())
+  papel     PapelMembroEquipe @default(MEMBRO)
+  criadoEm  DateTime         @default(now())
+
+  equipeId  Int
+  equipe    Equipe           @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+
+  usuarioId Int
+  usuario   Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([equipeId, usuarioId])
+}
+
+model ConviteEquipe {
+  id          Int                 @id @default(autoincrement())
+  token       String              @unique
+  status      StatusConviteEquipe @default(PENDENTE)
+  criadoEm    DateTime            @default(now())
+  expiraEm    DateTime?
+
+  equipeId    Int
+  equipe      Equipe              @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+
+  criadoPorId Int
+  criadoPor   Usuario             @relation("ConvitesCriados", fields: [criadoPorId], references: [id], onDelete: Cascade)
 }
 
 model Campeonato {
@@ -92,6 +152,9 @@ model Participante {
 
   usuarioId       Int?
   usuario         Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  equipeId        Int?
+  equipe          Equipe?          @relation(fields: [equipeId], references: [id], onDelete: SetNull)
 
   jogadores       Jogador[]
 

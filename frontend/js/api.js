@@ -4,6 +4,10 @@ function obterToken() {
   return localStorage.getItem("tokenAdmin");
 }
 
+function obterTokenParticipante() {
+  return localStorage.getItem("tokenParticipante");
+}
+
 function obterCabecalhos(headersExtras = {}, usarTokenAdmin = true) {
   const headers = {
     "Content-Type": "application/json",
@@ -19,6 +23,14 @@ function obterCabecalhos(headersExtras = {}, usarTokenAdmin = true) {
   }
 
   return headers;
+}
+
+function obterCabecalhoParticipante() {
+  const tokenParticipante = obterTokenParticipante();
+
+  return tokenParticipante
+    ? { Authorization: `Bearer ${tokenParticipante}` }
+    : {};
 }
 
 async function fazerRequisicao(caminho, opcoes = {}) {
@@ -52,25 +64,23 @@ async function loginAdmin(dados) {
 async function cadastrarParticipante(dados) {
   return fazerRequisicao("/usuarios/cadastro", {
     method: "POST",
-    body: JSON.stringify(dados)
+    body: JSON.stringify(dados),
+    usarTokenAdmin: false
   });
 }
 
 async function loginParticipante(dados) {
   return fazerRequisicao("/usuarios/login", {
     method: "POST",
-    body: JSON.stringify(dados)
+    body: JSON.stringify(dados),
+    usarTokenAdmin: false
   });
 }
 
 async function listarMinhasInscricoes() {
-  const tokenParticipante = localStorage.getItem("tokenParticipante");
-
   return fazerRequisicao("/usuarios/minhas-inscricoes", {
     method: "GET",
-    headers: tokenParticipante
-      ? { Authorization: `Bearer ${tokenParticipante}` }
-      : {},
+    headers: obterCabecalhoParticipante(),
     usarTokenAdmin: false
   });
 }
@@ -123,13 +133,9 @@ async function buscarCampeonatoPorId(id) {
 }
 
 async function criarInscricao(campeonatoId, dadosInscricao) {
-  const tokenParticipante = localStorage.getItem("tokenParticipante");
-
   return fazerRequisicao(`/campeonatos/${campeonatoId}/inscricoes`, {
     method: "POST",
-    headers: tokenParticipante
-      ? { Authorization: `Bearer ${tokenParticipante}` }
-      : {},
+    headers: obterCabecalhoParticipante(),
     body: JSON.stringify(dadosInscricao),
     usarTokenAdmin: false
   });
@@ -179,19 +185,15 @@ async function atualizarInscricao(inscricaoId, dadosInscricao) {
 }
 
 async function buscarPerfilParticipante() {
-  const tokenParticipante = localStorage.getItem("tokenParticipante");
-
   return fazerRequisicao("/usuarios/perfil", {
     method: "GET",
-    headers: tokenParticipante
-      ? { Authorization: `Bearer ${tokenParticipante}` }
-      : {},
+    headers: obterCabecalhoParticipante(),
     usarTokenAdmin: false
   });
 }
 
 async function atualizarFotoPerfilParticipante(arquivo) {
-  const tokenParticipante = localStorage.getItem("tokenParticipante");
+  const tokenParticipante = obterTokenParticipante();
 
   if (!arquivo) {
     throw new Error("Nenhum arquivo selecionado.");
@@ -218,14 +220,83 @@ async function atualizarFotoPerfilParticipante(arquivo) {
 }
 
 async function atualizarPerfilParticipante(dados) {
-  const tokenParticipante = localStorage.getItem("tokenParticipante");
-
   return fazerRequisicao("/usuarios/perfil", {
     method: "PUT",
-    headers: tokenParticipante
-      ? { Authorization: `Bearer ${tokenParticipante}` }
-      : {},
+    headers: obterCabecalhoParticipante(),
     body: JSON.stringify(dados),
+    usarTokenAdmin: false
+  });
+}
+
+async function criarEquipe(dadosEquipe) {
+  return fazerRequisicao("/equipes", {
+    method: "POST",
+    headers: obterCabecalhoParticipante(),
+    body: JSON.stringify(dadosEquipe),
+    usarTokenAdmin: false
+  });
+}
+
+async function listarMinhasEquipes() {
+  return fazerRequisicao("/equipes/minhas", {
+    method: "GET",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
+async function buscarEquipe(equipeId) {
+  return fazerRequisicao(`/equipes/${equipeId}`, {
+    method: "GET",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
+async function atualizarEquipe(equipeId, dadosEquipe) {
+  return fazerRequisicao(`/equipes/${equipeId}`, {
+    method: "PUT",
+    headers: obterCabecalhoParticipante(),
+    body: JSON.stringify(dadosEquipe),
+    usarTokenAdmin: false
+  });
+}
+
+async function excluirEquipe(equipeId) {
+  return fazerRequisicao(`/equipes/${equipeId}`, {
+    method: "DELETE",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
+async function removerMembroEquipe(equipeId, membroId) {
+  return fazerRequisicao(`/equipes/${equipeId}/membros/${membroId}`, {
+    method: "DELETE",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
+async function gerarConviteEquipe(equipeId) {
+  return fazerRequisicao(`/equipes/${equipeId}/convites`, {
+    method: "POST",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
+async function buscarConviteEquipe(token) {
+  return fazerRequisicao(`/equipes/convites/${token}`, {
+    method: "GET",
+    usarTokenAdmin: false
+  });
+}
+
+async function aceitarConviteEquipe(token) {
+  return fazerRequisicao(`/equipes/convites/${token}/aceitar`, {
+    method: "POST",
+    headers: obterCabecalhoParticipante(),
     usarTokenAdmin: false
   });
 }
@@ -254,5 +325,15 @@ export {
   buscarPerfilParticipante,
   atualizarPerfilParticipante,
   atualizarFotoPerfilParticipante,
-  obterToken
+  criarEquipe,
+  listarMinhasEquipes,
+  buscarEquipe,
+  atualizarEquipe,
+  excluirEquipe,
+  removerMembroEquipe,
+  gerarConviteEquipe,
+  buscarConviteEquipe,
+  aceitarConviteEquipe,
+  obterToken,
+  obterTokenParticipante
 };

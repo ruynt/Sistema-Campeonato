@@ -3,17 +3,18 @@ import inscricaoServico from "../servicos/inscricao.servico.js";
 async function inscrever(req, res) {
   try {
     const { id } = req.params;
-    const { nomeEquipe, responsavel, contato, jogadores } = req.body;
+    const { equipeId, nomeEquipe, responsavel, contato, jogadores } = req.body;
 
-    if (!nomeEquipe || !responsavel || !jogadores) {
+    if (!equipeId && (!nomeEquipe || !responsavel || !jogadores)) {
       return res.status(400).json({
-        erro: "nomeEquipe, responsavel e jogadores são obrigatórios."
+        erro: "Informe equipeId ou os dados manuais da inscrição."
       });
     }
 
     const participante = await inscricaoServico.inscrever(
       id,
       {
+        equipeId,
         nomeEquipe,
         responsavel,
         contato,

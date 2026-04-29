@@ -8,6 +8,7 @@ import placarRotas from "./rotas/placar.rotas.js";
 import podioRotas from "./rotas/podio.rotas.js";
 import resumoRotas from "./rotas/resumo.rotas.js";
 import usuarioRotas from "./rotas/usuario.rotas.js";
+import equipeRotas from "./rotas/equipe.rotas.js";
 
 const app = express();
 
@@ -28,5 +29,6 @@ app.use("/campeonatos", chaveamentoRotas);
 app.use("/campeonatos", podioRotas);
 app.use("/campeonatos", resumoRotas);
 app.use("/", placarRotas);
+app.use("/equipes", equipeRotas);
 
 export { app };

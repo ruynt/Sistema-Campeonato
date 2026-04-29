@@ -1,7 +1,13 @@
 import {
   buscarPerfilParticipante,
   atualizarPerfilParticipante,
-  atualizarFotoPerfilParticipante
+  atualizarFotoPerfilParticipante,
+  criarEquipe,
+  listarMinhasEquipes,
+  gerarConviteEquipe,
+  atualizarEquipe,
+  excluirEquipe,
+  removerMembroEquipe
 } from "./api.js";
 
 const perfilParticipanteBox = document.getElementById("perfil-participante-box");
@@ -9,8 +15,12 @@ const mensagemPerfilParticipante = document.getElementById("mensagem-perfil-part
 const botaoLogoutParticipante = document.getElementById("botao-logout-participante");
 
 let usuarioAtual = null;
+let equipesAtual = [];
 let modoEdicao = false;
 let arquivoFotoSelecionado = null;
+let equipeAbertaId = null;
+let equipeEmEdicaoId = null;
+let conviteGeradoPorEquipe = {};
 
 function obterTokenParticipante() {
   return localStorage.getItem("tokenParticipante");
@@ -95,6 +105,517 @@ function obterUrlFoto(fotoPerfil) {
   return `http://localhost:3333${fotoPerfil}`;
 }
 
+function traduzirSexo(sexo) {
+  const mapa = {
+    MASCULINO: "Masculino",
+    FEMININO: "Feminino"
+  };
+
+  return mapa[sexo] || "Não informado";
+}
+
+function traduzirTipoEquipe(tipo) {
+  const mapa = {
+    DUPLA: "Dupla",
+    TIME: "Quarteto"
+  };
+
+  return mapa[tipo] || tipo;
+}
+
+function traduzirPapelEquipe(papel) {
+  const mapa = {
+    DONO: "Capitão",
+    MEMBRO: "Membro"
+  };
+
+  return mapa[papel] || papel;
+}
+
+function obterLimiteMembros(tipoParticipante) {
+  if (tipoParticipante === "DUPLA") return 2;
+  if (tipoParticipante === "TIME") return 4;
+  return 0;
+}
+
+function obterResumoCategoriaEquipe(equipe) {
+  const membros = equipe.membros || [];
+  const masculinos = membros.filter((membro) => membro.usuario?.sexo === "MASCULINO").length;
+  const femininos = membros.filter((membro) => membro.usuario?.sexo === "FEMININO").length;
+
+  if (equipe.tipoParticipante === "DUPLA") {
+    if (masculinos === 2) return "Compatível com masculino";
+    if (femininos === 2) return "Compatível com feminino";
+    if (masculinos === 1 && femininos === 1) return "Compatível com misto";
+  }
+
+  if (equipe.tipoParticipante === "TIME") {
+    if (masculinos === 4) return "Compatível com masculino";
+    if (femininos === 4) return "Compatível com feminino";
+    if (masculinos === 2 && femininos === 2) return "Compatível com misto";
+  }
+
+  return "Categoria ainda indefinida";
+}
+
+function equipeEstaCompleta(equipe) {
+  return (equipe.membros?.length || 0) >= obterLimiteMembros(equipe.tipoParticipante);
+}
+
+function montarLinkConvite(token) {
+  const caminhoAtual = window.location.pathname;
+  const pastaAtual = caminhoAtual.substring(0, caminhoAtual.lastIndexOf("/") + 1);
+
+  return `${window.location.origin}${pastaAtual}convite-equipe.html?token=${token}`;
+}
+
+function renderizarBlocoEquipes() {
+  return `
+    <section class="area-edicao-campeonato">
+      <div class="titulo-secao">
+        <div>
+          <h2>Minhas equipes</h2>
+          <p class="info-auxiliar">
+            Crie duplas ou quartetos e gere convites para outros participantes entrarem.
+          </p>
+        </div>
+      </div>
+
+      <form id="form-criar-equipe" class="formulario-edicao-campeonato">
+        <div class="grupo-formulario">
+          <label for="nome-equipe">Nome da equipe</label>
+          <input
+            type="text"
+            id="nome-equipe"
+            name="nomeEquipe"
+            placeholder="Ex: Vôlei Jampa A"
+            required
+          />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="tipo-equipe">Tipo</label>
+          <select id="tipo-equipe" name="tipoParticipante" required>
+            <option value="DUPLA">Dupla</option>
+            <option value="TIME">Quarteto</option>
+          </select>
+        </div>
+
+        <div class="acoes-card">
+          <button type="submit" class="botao-pequeno">Criar equipe</button>
+        </div>
+      </form>
+
+      <div class="lista-simples" style="margin-top: 16px;">
+        ${
+          equipesAtual.length
+            ? equipesAtual.map((equipe) => renderizarCardEquipe(equipe)).join("")
+            : "<p>Nenhuma equipe criada ou vinculada ainda.</p>"
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderizarFormularioEdicaoEquipe(equipe) {
+  return `
+    <div class="area-edicao-inscricao">
+      <h4>Editar equipe</h4>
+
+      <form class="formulario-edicao-inscricao" data-form-editar-equipe-id="${equipe.id}">
+        <div class="grupo-formulario">
+          <label>Nome da equipe</label>
+          <input
+            type="text"
+            name="nomeEquipe"
+            value="${equipe.nome}"
+            required
+          />
+        </div>
+
+        <div class="grupo-formulario">
+          <label>Tipo</label>
+          <select name="tipoParticipante" required>
+            <option value="DUPLA" ${equipe.tipoParticipante === "DUPLA" ? "selected" : ""}>Dupla</option>
+            <option value="TIME" ${equipe.tipoParticipante === "TIME" ? "selected" : ""}>Quarteto</option>
+          </select>
+          <small class="texto-ajuda">
+            Só será possível mudar o tipo se a quantidade atual de membros permitir.
+          </small>
+        </div>
+
+        <div class="acoes-card">
+          <button type="submit" class="botao-pequeno">Salvar equipe</button>
+          <button
+            type="button"
+            class="botao-pequeno secundario"
+            data-cancelar-edicao-equipe-id="${equipe.id}"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function renderizarListaMembrosEquipe(equipe, usuarioEhCapitao) {
+  return `
+    <ul>
+      ${(equipe.membros || [])
+        .map((membro) => {
+          const ehCapitao = membro.usuarioId === equipe.donoId;
+          const podeExpulsar =
+            usuarioEhCapitao &&
+            !ehCapitao &&
+            membro.usuarioId !== usuarioAtual?.id;
+
+          return `
+            <li style="margin-bottom: 10px;">
+              <span>
+                ${membro.usuario?.nome || "Usuário"}
+                — ${traduzirPapelEquipe(membro.papel)}
+                — ${traduzirSexo(membro.usuario?.sexo)}
+              </span>
+
+              ${
+                podeExpulsar
+                  ? `
+                    <button
+                      type="button"
+                      class="botao-pequeno botao-excluir"
+                      style="margin-left: 8px; padding: 6px 10px;"
+                      data-remover-membro-equipe-id="${equipe.id}"
+                      data-remover-membro-id="${membro.id}"
+                      data-remover-membro-nome="${membro.usuario?.nome || "Usuário"}"
+                    >
+                      Expulsar
+                    </button>
+                  `
+                  : ""
+              }
+            </li>
+          `;
+        })
+        .join("")}
+    </ul>
+  `;
+}
+
+function renderizarCardEquipe(equipe) {
+  const aberta = equipeAbertaId === equipe.id;
+  const editando = equipeEmEdicaoId === equipe.id;
+  const limite = obterLimiteMembros(equipe.tipoParticipante);
+  const totalMembros = equipe.membros?.length || 0;
+  const completa = equipeEstaCompleta(equipe);
+  const convite = conviteGeradoPorEquipe[equipe.id];
+  const usuarioEhCapitao = equipe.donoId === usuarioAtual?.id;
+
+  return `
+    <div class="item-lista">
+      <h3>${equipe.nome}</h3>
+      <p><strong>Tipo:</strong> ${traduzirTipoEquipe(equipe.tipoParticipante)}</p>
+      <p><strong>Membros:</strong> ${totalMembros}/${limite}</p>
+      <p><strong>Status:</strong> ${completa ? "Equipe completa" : "Equipe incompleta"}</p>
+      <p><strong>Categoria:</strong> ${obterResumoCategoriaEquipe(equipe)}</p>
+      <p><strong>Capitão:</strong> ${equipe.dono?.nome || "Não informado"}</p>
+
+      <div class="acoes-card">
+        <button
+          class="botao-pequeno"
+          type="button"
+          data-alternar-equipe-id="${equipe.id}"
+        >
+          ${aberta ? "Ocultar detalhes" : "Ver detalhes"}
+        </button>
+
+        ${
+          usuarioEhCapitao
+            ? `
+              <button
+                class="botao-pequeno secundario"
+                type="button"
+                data-editar-equipe-id="${equipe.id}"
+              >
+                Editar equipe
+              </button>
+
+              <button
+                class="botao-pequeno botao-excluir"
+                type="button"
+                data-excluir-equipe-id="${equipe.id}"
+              >
+                Excluir equipe
+              </button>
+            `
+            : ""
+        }
+
+        ${
+          usuarioEhCapitao && !completa
+            ? `
+              <button
+                class="botao-pequeno secundario"
+                type="button"
+                data-gerar-convite-equipe-id="${equipe.id}"
+              >
+                Gerar convite
+              </button>
+            `
+            : ""
+        }
+      </div>
+
+      ${editando ? renderizarFormularioEdicaoEquipe(equipe) : ""}
+
+      ${
+        convite
+          ? `
+            <div class="area-edicao-inscricao">
+              <h4>Link de convite</h4>
+              <p class="info-auxiliar">
+                Envie este link para a pessoa que você quer convidar:
+              </p>
+
+              <input
+                id="input-link-convite-${equipe.id}"
+                type="text"
+                value="${montarLinkConvite(convite.token)}"
+                readonly
+                style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 10px; margin-top: 8px;"
+              />
+
+              <div class="acoes-card">
+                <button
+                  type="button"
+                  class="botao-pequeno"
+                  data-copiar-convite-equipe-id="${equipe.id}"
+                >
+                  Copiar link
+                </button>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        aberta
+          ? `
+            <div class="area-edicao-inscricao">
+              <h4>Detalhes da equipe</h4>
+
+              <p><strong>Capitão:</strong> ${equipe.dono?.nome || "Não informado"}</p>
+
+              ${renderizarListaMembrosEquipe(equipe, usuarioEhCapitao)}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function conectarEventosEquipes() {
+  const formCriarEquipe = document.getElementById("form-criar-equipe");
+
+  if (formCriarEquipe) {
+    formCriarEquipe.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      try {
+        mensagemPerfilParticipante.textContent = "Criando equipe...";
+
+        const formData = new FormData(formCriarEquipe);
+
+        await criarEquipe({
+          nome: formData.get("nomeEquipe")?.toString().trim(),
+          tipoParticipante: formData.get("tipoParticipante")?.toString()
+        });
+
+        formCriarEquipe.reset();
+        await carregarEquipes();
+        renderizarPerfil();
+        mensagemPerfilParticipante.textContent = "Equipe criada com sucesso.";
+      } catch (error) {
+        mensagemPerfilParticipante.textContent = `Erro ao criar equipe: ${error.message}`;
+      }
+    });
+  }
+
+  const botoesAlternar = document.querySelectorAll("[data-alternar-equipe-id]");
+
+  botoesAlternar.forEach((botao) => {
+    botao.addEventListener("click", () => {
+      const id = Number(botao.dataset.alternarEquipeId);
+      equipeAbertaId = equipeAbertaId === id ? null : id;
+      renderizarPerfil();
+      mensagemPerfilParticipante.textContent = "";
+    });
+  });
+
+  const botoesEditar = document.querySelectorAll("[data-editar-equipe-id]");
+
+  botoesEditar.forEach((botao) => {
+    botao.addEventListener("click", () => {
+      equipeEmEdicaoId = Number(botao.dataset.editarEquipeId);
+      equipeAbertaId = equipeEmEdicaoId;
+      renderizarPerfil();
+      mensagemPerfilParticipante.textContent = "";
+    });
+  });
+
+  const botoesCancelarEdicao = document.querySelectorAll("[data-cancelar-edicao-equipe-id]");
+
+  botoesCancelarEdicao.forEach((botao) => {
+    botao.addEventListener("click", () => {
+      equipeEmEdicaoId = null;
+      renderizarPerfil();
+      mensagemPerfilParticipante.textContent = "Edição da equipe cancelada.";
+    });
+  });
+
+  const formsEdicaoEquipe = document.querySelectorAll("[data-form-editar-equipe-id]");
+
+  formsEdicaoEquipe.forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const equipeId = Number(form.dataset.formEditarEquipeId);
+
+      try {
+        mensagemPerfilParticipante.textContent = "Salvando equipe...";
+
+        const formData = new FormData(form);
+
+        await atualizarEquipe(equipeId, {
+          nome: formData.get("nomeEquipe")?.toString().trim(),
+          tipoParticipante: formData.get("tipoParticipante")?.toString()
+        });
+
+        equipeEmEdicaoId = null;
+        await carregarEquipes();
+        renderizarPerfil();
+        mensagemPerfilParticipante.textContent = "Equipe atualizada com sucesso.";
+      } catch (error) {
+        mensagemPerfilParticipante.textContent = `Erro ao atualizar equipe: ${error.message}`;
+      }
+    });
+  });
+
+  const botoesExcluir = document.querySelectorAll("[data-excluir-equipe-id]");
+
+  botoesExcluir.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const equipeId = Number(botao.dataset.excluirEquipeId);
+
+      const confirmar = window.confirm(
+        "Tem certeza que deseja excluir esta equipe? Os membros e convites vinculados a ela também serão removidos."
+      );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        mensagemPerfilParticipante.textContent = "Excluindo equipe...";
+
+        await excluirEquipe(equipeId);
+
+        if (equipeAbertaId === equipeId) {
+          equipeAbertaId = null;
+        }
+
+        if (equipeEmEdicaoId === equipeId) {
+          equipeEmEdicaoId = null;
+        }
+
+        delete conviteGeradoPorEquipe[equipeId];
+
+        await carregarEquipes();
+        renderizarPerfil();
+        mensagemPerfilParticipante.textContent = "Equipe excluída com sucesso.";
+      } catch (error) {
+        mensagemPerfilParticipante.textContent = `Erro ao excluir equipe: ${error.message}`;
+      }
+    });
+  });
+
+  const botoesRemoverMembro = document.querySelectorAll("[data-remover-membro-id]");
+
+  botoesRemoverMembro.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const equipeId = Number(botao.dataset.removerMembroEquipeId);
+      const membroId = Number(botao.dataset.removerMembroId);
+      const nomeMembro = botao.dataset.removerMembroNome || "este membro";
+
+      const confirmar = window.confirm(
+        `Tem certeza que deseja expulsar ${nomeMembro} desta equipe?`
+      );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        mensagemPerfilParticipante.textContent = "Removendo membro...";
+
+        await removerMembroEquipe(equipeId, membroId);
+
+        delete conviteGeradoPorEquipe[equipeId];
+
+        await carregarEquipes();
+        renderizarPerfil();
+        mensagemPerfilParticipante.textContent = "Membro removido da equipe com sucesso.";
+      } catch (error) {
+        mensagemPerfilParticipante.textContent = `Erro ao remover membro: ${error.message}`;
+      }
+    });
+  });
+
+  const botoesConvite = document.querySelectorAll("[data-gerar-convite-equipe-id]");
+
+  botoesConvite.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const equipeId = Number(botao.dataset.gerarConviteEquipeId);
+
+      try {
+        mensagemPerfilParticipante.textContent = "Gerando convite...";
+
+        const convite = await gerarConviteEquipe(equipeId);
+        conviteGeradoPorEquipe[equipeId] = convite;
+
+        renderizarPerfil();
+        mensagemPerfilParticipante.textContent = "Convite gerado com sucesso.";
+      } catch (error) {
+        mensagemPerfilParticipante.textContent = `Erro ao gerar convite: ${error.message}`;
+      }
+    });
+  });
+
+  const botoesCopiarConvite = document.querySelectorAll("[data-copiar-convite-equipe-id]");
+
+  botoesCopiarConvite.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const equipeId = Number(botao.dataset.copiarConviteEquipeId);
+      const inputLink = document.getElementById(`input-link-convite-${equipeId}`);
+
+      if (!inputLink) {
+        mensagemPerfilParticipante.textContent = "Link de convite não encontrado.";
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(inputLink.value);
+        mensagemPerfilParticipante.textContent = "Link de convite copiado.";
+      } catch {
+        inputLink.select();
+        mensagemPerfilParticipante.textContent = "Copie o link manualmente.";
+      }
+    });
+  });
+}
+
 function renderizarPerfilVisualizacao(usuario) {
   const foto = usuario.fotoPerfil
     ? `<img src="${obterUrlFoto(usuario.fotoPerfil)}" alt="Foto de perfil" class="foto-perfil-participante" />`
@@ -110,6 +631,7 @@ function renderizarPerfilVisualizacao(usuario) {
         <p><strong>Nome:</strong> ${usuario.nome}</p>
         <p><strong>E-mail:</strong> ${usuario.email}</p>
         <p><strong>Contato:</strong> ${formatarTelefone(usuario.contato)}</p>
+        <p><strong>Sexo:</strong> ${traduzirSexo(usuario.sexo)}</p>
         <p><strong>Data de aniversário:</strong> ${formatarAniversario(usuario.dataNascimento)}</p>
         <p><strong>Conta criada em:</strong> ${formatarData(usuario.criadoEm)}</p>
       </div>
@@ -120,6 +642,8 @@ function renderizarPerfilVisualizacao(usuario) {
         </button>
       </div>
     </div>
+
+    ${renderizarBlocoEquipes()}
   `;
 
   const botaoEditarPerfil = document.getElementById("botao-editar-perfil");
@@ -132,6 +656,8 @@ function renderizarPerfilVisualizacao(usuario) {
       mensagemPerfilParticipante.textContent = "";
     });
   }
+
+  conectarEventosEquipes();
 }
 
 function renderizarPerfilEdicao(usuario) {
@@ -171,6 +697,15 @@ function renderizarPerfilEdicao(usuario) {
             inputmode="numeric"
             required
           />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="perfil-sexo">Sexo</label>
+          <select id="perfil-sexo" name="sexo" required>
+            <option value="">Selecione</option>
+            <option value="MASCULINO" ${usuario.sexo === "MASCULINO" ? "selected" : ""}>Masculino</option>
+            <option value="FEMININO" ${usuario.sexo === "FEMININO" ? "selected" : ""}>Feminino</option>
+          </select>
         </div>
 
         <div class="grupo-formulario">
@@ -244,11 +779,13 @@ function renderizarPerfilEdicao(usuario) {
 
         const nome = document.getElementById("perfil-nome").value.trim();
         const contato = somenteNumeros(document.getElementById("perfil-contato").value.trim());
+        const sexo = document.getElementById("perfil-sexo").value;
         const dataNascimento = document.getElementById("perfil-dataNascimento").value;
 
         let usuarioAtualizado = await atualizarPerfilParticipante({
           nome,
           contato,
+          sexo,
           dataNascimento
         });
 
@@ -261,6 +798,7 @@ function renderizarPerfilEdicao(usuario) {
           ...usuarioAtualizado,
           nome,
           contato,
+          sexo,
           dataNascimento
         };
 
@@ -288,10 +826,15 @@ function renderizarPerfil() {
   renderizarPerfilVisualizacao(usuarioAtual);
 }
 
+async function carregarEquipes() {
+  equipesAtual = await listarMinhasEquipes();
+}
+
 async function carregarPerfil() {
   try {
     mensagemPerfilParticipante.textContent = "Carregando perfil...";
     usuarioAtual = await buscarPerfilParticipante();
+    await carregarEquipes();
     renderizarPerfil();
     mensagemPerfilParticipante.textContent = "";
   } catch (error) {
