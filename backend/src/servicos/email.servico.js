@@ -27,9 +27,8 @@ async function enviarEmailVerificacao({ nome, email, token }) {
     throw new Error("Token de verificação não informado.");
   }
 
-  const urlFrontend = obterUrlFrontend();
-
-  const linkVerificacao = `${urlFrontend}/paginas/verificar-email.html?token=${token}`;
+  const urlFrontend = obterUrlFrontend().replace(/\/+$/, "");
+  const linkVerificacao = `${urlFrontend}/verificar-email?token=${encodeURIComponent(token)}`;
 
   const resposta = await resend.emails.send({
     from: obterEmailRemetente(),
