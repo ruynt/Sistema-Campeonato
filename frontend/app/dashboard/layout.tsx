@@ -57,13 +57,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (typeof window === "undefined") return;
     const isMobile = window.matchMedia?.("(max-width: 760px)")?.matches;
     if (isMobile) setSidebarAberta(false);
-  }, [pathname]);
+  }, [pathname, sessao.papel]);
 
   const titulo = useMemo(() => {
     if (pathname === "/dashboard") return "Dashboard";
-    if (pathname.startsWith("/dashboard/campeonatos")) return "Campeonatos";
+    if (pathname.startsWith("/dashboard/campeonatos")) {
+      return sessao.papel === "ADMIN" ? "Inscrições" : "Campeonatos";
+    }
     if (pathname.startsWith("/dashboard/minhas-inscricoes")) return "Minhas inscrições";
-    if (pathname.startsWith("/dashboard/admin")) return "Administração";
+    if (pathname.startsWith("/dashboard/admin")) return "Campeonatos";
     return "Dashboard";
   }, [pathname]);
 

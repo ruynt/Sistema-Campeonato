@@ -253,6 +253,22 @@ export async function reprovarInscricaoIndividual(
   });
 }
 
+export async function atualizarInscricaoIndividual(
+  inscricaoId: string | number,
+  payload: { tamanhoCamisa?: string; valorTotalCentavos?: number; observacaoAdmin?: string }
+) {
+  return fazerRequisicao(`/campeonatos/inscricoes-individuais/${inscricaoId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function excluirInscricaoIndividual(inscricaoId: string | number) {
+  return fazerRequisicao(`/campeonatos/inscricoes-individuais/${inscricaoId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function montarEquipeComInscricoesIndividuais(
   campeonatoId: string | number,
   payload: {

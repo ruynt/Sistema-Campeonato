@@ -6,6 +6,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Shield,
@@ -117,7 +118,7 @@ export default function DashboardToolbar({
                   <span className="dash-link-icon" aria-hidden>
                     <Shield size={18} />
                   </span>
-                  <span className="dash-link-text">Administração</span>
+                  <span className="dash-link-text">Campeonatos</span>
                 </Link>
                 <Link
                   href={rotas.campeonatos}
@@ -127,9 +128,9 @@ export default function DashboardToolbar({
                   onClick={onNavegar}
                 >
                   <span className="dash-link-icon" aria-hidden>
-                    <Trophy size={18} />
+                    <ClipboardList size={18} />
                   </span>
-                  <span className="dash-link-text">Campeonatos</span>
+                  <span className="dash-link-text">Inscrições</span>
                 </Link>
               </>
             ) : (
