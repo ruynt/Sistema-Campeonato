@@ -2,29 +2,58 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../banco/prisma.js";
 
 async function main() {
-  const nome = "Administrador Principal";
-  const email = "admin@plataforma.com";
-  const loginAdmin = "admin";
-  const senha = "123456";
+  const nome = "seu nome";
+  const email = "seunome@voleiclubjampa.com";
+  const loginAdmin = "coloque-seu-usuario";
+  const senha = "coloque-sua-senha";
+
+  const emailTratado = email.trim().toLowerCase();
+  const loginAdminTratado = loginAdmin.trim().toLowerCase();
+
+  const senhaHash = await bcrypt.hash(senha, 10);
 
   const usuarioComEmailExistente = await prisma.usuario.findUnique({
     where: {
-      email
+      email: emailTratado
     }
   });
 
-  if (usuarioComEmailExistente) {
+  const usuarioComLoginExistente = await prisma.usuario.findUnique({
+    where: {
+      loginAdmin: loginAdminTratado
+    }
+  });
+
+  if (
+    usuarioComEmailExistente &&
+    usuarioComLoginExistente &&
+    usuarioComEmailExistente.id !== usuarioComLoginExistente.id
+  ) {
+    throw new Error(
+      "Já existe um usuário com esse e-mail e outro usuário diferente com esse loginAdmin. Ajuste manualmente no banco antes de continuar."
+    );
+  }
+
+  const usuarioExistente = usuarioComEmailExistente || usuarioComLoginExistente;
+
+  if (usuarioExistente) {
     const adminAtualizado = await prisma.usuario.update({
       where: {
-        id: usuarioComEmailExistente.id
+        id: usuarioExistente.id
       },
       data: {
-        loginAdmin,
-        emailVerificado: true
+        nome,
+        email: emailTratado,
+        loginAdmin: loginAdminTratado,
+        senhaHash,
+        papel: "ADMIN",
+        emailVerificado: true,
+        tokenVerificacaoEmail: null,
+        tokenVerificacaoExpiraEm: null
       }
     });
 
-    console.log("Já existia um usuário com esse e-mail. Admin atualizado com loginAdmin:");
+    console.log("Admin atualizado com sucesso:");
     console.log({
       id: adminAtualizado.id,
       nome: adminAtualizado.nome,
@@ -37,27 +66,16 @@ async function main() {
     return;
   }
 
-  const usuarioComLoginExistente = await prisma.usuario.findUnique({
-    where: {
-      loginAdmin
-    }
-  });
-
-  if (usuarioComLoginExistente) {
-    console.log("Já existe um admin com esse usuário de login.");
-    return;
-  }
-
-  const senhaHash = await bcrypt.hash(senha, 10);
-
   const admin = await prisma.usuario.create({
     data: {
       nome,
-      email,
-      loginAdmin,
+      email: emailTratado,
+      loginAdmin: loginAdminTratado,
       senhaHash,
       papel: "ADMIN",
-      emailVerificado: true
+      emailVerificado: true,
+      tokenVerificacaoEmail: null,
+      tokenVerificacaoExpiraEm: null
     }
   });
 
@@ -74,11 +92,11 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error("Erro ao criar admin:", error);
+    console.error("Erro ao criar/atualizar admin:", error);
   })
   .finally(async () => {
     await prisma.$disconnect();
   });
 
-  // para rodar use: node src/scripts/criarAdmin.js
-  
+// Para rodar:
+// node src/scripts/criar-admin.js
