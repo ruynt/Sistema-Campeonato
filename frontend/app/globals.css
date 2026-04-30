@@ -138,6 +138,89 @@ body {
   gap: 12px;
 }
 
+.auth-form--compact {
+  gap: 10px;
+}
+
+.auth-title {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.auth-title h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  letter-spacing: -0.2px;
+  color: var(--brand-navy);
+}
+
+.auth-title p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(32, 54, 103, 0.72);
+  line-height: 1.45;
+}
+
+.auth-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-submit--secondary {
+  background: rgba(32, 54, 103, 0.1);
+  color: rgba(32, 54, 103, 0.92);
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.auth-submit--secondary:hover {
+  filter: none;
+  background: rgba(32, 54, 103, 0.14);
+}
+
+.auth-divider {
+  height: 1px;
+  width: 100%;
+  background: rgba(32, 54, 103, 0.14);
+  border-radius: 999px;
+  margin-top: 4px;
+}
+
+.auth-reenvio-title {
+  font-weight: 1000;
+  color: rgba(32, 54, 103, 0.82);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.auth-banner {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+
+.auth-banner--success {
+  background: #dcfce7;
+  color: #166534;
+  border-color: rgba(22, 101, 52, 0.22);
+}
+
+.auth-banner--error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: rgba(153, 27, 27, 0.22);
+}
+
+.auth-banner--info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: rgba(29, 78, 216, 0.22);
+}
+
 .auth-field {
   position: relative;
 }
@@ -218,6 +301,19 @@ body {
   background: #fff;
 }
 
+.auth-field input[aria-invalid="true"],
+.auth-field select[aria-invalid="true"] {
+  border-color: rgba(185, 28, 28, 0.75);
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.18);
+  background: rgba(254, 226, 226, 0.35);
+}
+
+.auth-field input[aria-invalid="true"]:focus,
+.auth-field select[aria-invalid="true"]:focus {
+  border-color: rgba(185, 28, 28, 0.85);
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.26);
+}
+
 .auth-submit {
   height: 48px;
   border: 0;
@@ -272,6 +368,36 @@ body {
   font-size: 0.95rem;
   color: rgba(32, 54, 103, 0.85);
   text-align: center;
+}
+
+.auth-message--error {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.verificacao-msg {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.verificacao-msg--sucesso {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.verificacao-msg--erro {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.verificacao-msg--info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .auth-footnote {

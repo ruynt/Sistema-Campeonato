@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { cadastrarParticipante, loginParticipante } from "@/lib/api";
+import { cadastrarParticipante, loginParticipante, reenviarVerificacao } from "@/lib/api";
 import { chavesSessao, setJSONStorage, setStorage } from "@/lib/sessao";
 import { Calendar, Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react";
 
@@ -45,6 +45,13 @@ export default function LoginPage() {
   const [mostrarSenhaLogin, setMostrarSenhaLogin] = useState(false);
   const [mostrarSenhaCadastro, setMostrarSenhaCadastro] = useState(false);
   const [carregando, setCarregando] = useState<null | "LOGIN" | "CADASTRO">(null);
+  const [tentouCadastrar, setTentouCadastrar] = useState(false);
+  const [modalCadastroSucessoAberto, setModalCadastroSucessoAberto] = useState(false);
+  const [emailCadastroSucesso, setEmailCadastroSucesso] = useState("");
+  const [reenviandoVerificacao, setReenviandoVerificacao] = useState(false);
+  const [mensagemReenvio, setMensagemReenvio] = useState("");
+  const [loginEmailNaoVerificado, setLoginEmailNaoVerificado] = useState(false);
+  const [reenviandoVerificacaoLogin, setReenviandoVerificacaoLogin] = useState(false);
 
   const [cadastro, setCadastro] = useState({
     nome: "",
@@ -52,27 +59,53 @@ export default function LoginPage() {
     contato: "",
     sexo: "",
     dataNascimento: "",
-    senha: ""
+    senha: "",
+    confirmarSenha: ""
   });
   const [login, setLogin] = useState({ email: "", senha: "" });
 
   async function onCadastro(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setTentouCadastrar(true);
+    setMensagem("");
     setCarregando("CADASTRO");
     try {
+      const obrigatoriosPreenchidos =
+        cadastro.nome.trim() &&
+        cadastro.email.trim() &&
+        cadastro.contato.trim() &&
+        cadastro.sexo.trim() &&
+        cadastro.dataNascimento.trim() &&
+        cadastro.senha.trim() &&
+        cadastro.confirmarSenha.trim();
+
+      if (!obrigatoriosPreenchidos) {
+        setMensagem("Preencha todos os campos para continuar.");
+        return;
+      }
+
+      if (cadastro.senha !== cadastro.confirmarSenha) {
+        setMensagem("As senhas não conferem.");
+        return;
+      }
+
+      const { confirmarSenha: _confirmarSenha, ...payloadCadastro } = cadastro;
       await cadastrarParticipante({
-        ...cadastro,
-        contato: cadastro.contato.replace(/\D/g, "")
+        ...payloadCadastro,
+        contato: payloadCadastro.contato.replace(/\D/g, "")
       });
+      setEmailCadastroSucesso(payloadCadastro.email);
       setCadastro({
         nome: "",
         email: "",
         contato: "",
         sexo: "",
         dataNascimento: "",
-        senha: ""
+        senha: "",
+        confirmarSenha: ""
       });
-      setAba("LOGIN");
+      setTentouCadastrar(false);
+      setModalCadastroSucessoAberto(true);
     } catch (err) {
       const error = err as Error;
       setMensagem(`Erro no cadastro: ${error.message}`);
@@ -83,6 +116,8 @@ export default function LoginPage() {
 
   async function onLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setMensagem("");
+    setLoginEmailNaoVerificado(false);
     setCarregando("LOGIN");
     try {
       const resultado = (await loginParticipante(login)) as LoginResultado;
@@ -102,9 +137,86 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (err) {
       const error = err as Error;
-      setMensagem(`Erro no login: ${error.message}`);
+      const msg = String(error?.message || "");
+      const msgLower = msg.toLowerCase();
+      const erroEmailNaoVerificado =
+        msgLower.includes("verifique seu e-mail") ||
+        msgLower.includes("verifique seu email") ||
+        msgLower.includes("e-mail") && msgLower.includes("não verificado") ||
+        msgLower.includes("email") && msgLower.includes("não verificado");
+
+      if (erroEmailNaoVerificado) {
+        setLoginEmailNaoVerificado(true);
+        setMensagem(
+          "E-mail ainda não verificado. Antes de entrar no sistema, confirme seu e-mail clicando no link enviado."
+        );
+        return;
+      }
+
+      setMensagem(`Erro no login: ${msg}`);
     } finally {
       setCarregando(null);
+    }
+  }
+
+  const cadastroPodeEnviar =
+    carregando !== "CADASTRO" &&
+    cadastro.nome.trim().length > 0 &&
+    cadastro.email.trim().length > 0 &&
+    cadastro.contato.trim().length > 0 &&
+    cadastro.sexo.trim().length > 0 &&
+    cadastro.dataNascimento.trim().length > 0 &&
+    cadastro.senha.trim().length > 0 &&
+    cadastro.confirmarSenha.trim().length > 0 &&
+    cadastro.senha === cadastro.confirmarSenha;
+
+  const senhasDiferentes =
+    cadastro.senha.length > 0 &&
+    cadastro.confirmarSenha.length > 0 &&
+    cadastro.senha !== cadastro.confirmarSenha;
+
+  function fecharModalCadastroSucesso() {
+    setModalCadastroSucessoAberto(false);
+    setAba("LOGIN");
+    setMensagem("");
+    setMensagemReenvio("");
+    setReenviandoVerificacao(false);
+  }
+
+  async function onReenviarVerificacaoLogin() {
+    const email = login.email.trim();
+    if (!email) return;
+
+    setReenviandoVerificacaoLogin(true);
+    try {
+      const dados = (await reenviarVerificacao(email)) as any;
+      setMensagem(
+        dados?.mensagem ||
+          "E-mail de verificação reenviado com sucesso. Verifique sua caixa de entrada (e spam)."
+      );
+      setLoginEmailNaoVerificado(false);
+    } catch (err) {
+      const error = err as Error;
+      setMensagem(`Erro ao reenviar verificação: ${error.message}`);
+    } finally {
+      setReenviandoVerificacaoLogin(false);
+    }
+  }
+
+  async function onReenviarVerificacao() {
+    const email = emailCadastroSucesso.trim();
+    if (!email) return;
+
+    setMensagemReenvio("");
+    setReenviandoVerificacao(true);
+    try {
+      const dados = (await reenviarVerificacao(email)) as any;
+      setMensagemReenvio(dados?.mensagem || "E-mail de verificação reenviado com sucesso.");
+    } catch (err) {
+      const error = err as Error;
+      setMensagemReenvio(`Erro ao reenviar verificação: ${error.message}`);
+    } finally {
+      setReenviandoVerificacao(false);
     }
   }
 
@@ -204,6 +316,17 @@ export default function LoginPage() {
                   "Entrar"
                 )}
               </button>
+
+              {loginEmailNaoVerificado ? (
+                <button
+                  type="button"
+                  className="campeonatos-action campeonatos-action--primary"
+                  onClick={onReenviarVerificacaoLogin}
+                  disabled={reenviandoVerificacaoLogin || !login.email.trim()}
+                >
+                  {reenviandoVerificacaoLogin ? "Reenviando..." : "Reenviar e-mail de verificação"}
+                </button>
+              ) : null}
             </form>
           ) : (
             <form onSubmit={onCadastro} className="auth-form">
@@ -219,6 +342,7 @@ export default function LoginPage() {
                   placeholder="Nome"
                   autoComplete="name"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={tentouCadastrar && cadastro.nome.trim().length === 0}
                 />
               </div>
               <div className="auth-field">
@@ -234,6 +358,7 @@ export default function LoginPage() {
                   placeholder="E-mail"
                   autoComplete="email"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={tentouCadastrar && cadastro.email.trim().length === 0}
                 />
               </div>
               <div className="auth-field">
@@ -254,6 +379,7 @@ export default function LoginPage() {
                   autoComplete="tel"
                   inputMode="tel"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={tentouCadastrar && cadastro.contato.trim().length === 0}
                 />
               </div>
               <div className="auth-field">
@@ -267,6 +393,7 @@ export default function LoginPage() {
                   required
                   aria-label="Sexo"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={tentouCadastrar && cadastro.sexo.trim().length === 0}
                 >
                   <option value="" disabled hidden>
                     Sexo
@@ -290,6 +417,7 @@ export default function LoginPage() {
                   required
                   aria-label="Data de nascimento"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={tentouCadastrar && cadastro.dataNascimento.trim().length === 0}
                 />
               </div>
               <div className="auth-field">
@@ -305,6 +433,9 @@ export default function LoginPage() {
                   placeholder="Senha"
                   autoComplete="new-password"
                   disabled={carregando === "CADASTRO"}
+                  aria-invalid={
+                    (tentouCadastrar && cadastro.senha.trim().length === 0) || senhasDiferentes
+                  }
                 />
                 <button
                   type="button"
@@ -316,7 +447,40 @@ export default function LoginPage() {
                   {mostrarSenhaCadastro ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <button type="submit" className="auth-submit" disabled={carregando === "CADASTRO"}>
+              <div className="auth-field">
+                <span className="auth-field-icon" aria-hidden>
+                  <Lock size={18} />
+                </span>
+                <input
+                  id="cadastro-confirmar-senha"
+                  type={mostrarSenhaCadastro ? "text" : "password"}
+                  value={cadastro.confirmarSenha}
+                  onChange={(e) =>
+                    setCadastro((p) => ({ ...p, confirmarSenha: e.target.value }))
+                  }
+                  required
+                  placeholder="Confirmar senha"
+                  autoComplete="new-password"
+                  disabled={carregando === "CADASTRO"}
+                  aria-invalid={
+                    (tentouCadastrar && cadastro.confirmarSenha.trim().length === 0) ||
+                    senhasDiferentes
+                  }
+                />
+                <button
+                  type="button"
+                  className="auth-field-action"
+                  onClick={() => setMostrarSenhaCadastro((v) => !v)}
+                  aria-label={mostrarSenhaCadastro ? "Ocultar senha" : "Mostrar senha"}
+                  disabled={carregando === "CADASTRO"}
+                >
+                  {mostrarSenhaCadastro ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {senhasDiferentes ? (
+                <p className="auth-message auth-message--error">As senhas não conferem.</p>
+              ) : null}
+              <button type="submit" className="auth-submit" disabled={!cadastroPodeEnviar}>
                 {carregando === "CADASTRO" ? (
                   <>
                     <span className="auth-spinner" aria-hidden />
@@ -334,6 +498,63 @@ export default function LoginPage() {
           <p className="auth-footnote">© {new Date().getFullYear()} Vôlei Club Jampa</p>
         </section>
       </div>
+
+      {modalCadastroSucessoAberto ? (
+        <div
+          className="campeonatos-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmação de cadastro"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) fecharModalCadastroSucesso();
+          }}
+        >
+          <div className="campeonatos-modal">
+            <div className="campeonatos-modal-head">
+              <div>
+                <div className="campeonatos-modal-title">Cadastro realizado</div>
+                <div className="campeonatos-modal-name">
+                  Enviamos um e-mail de confirmação de cadastro. Verifique sua caixa de entrada (e
+                  spam).
+                </div>
+              </div>
+              <button
+                type="button"
+                className="campeonatos-modal-close"
+                onClick={fecharModalCadastroSucesso}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="campeonatos-modal-actions">
+              {emailCadastroSucesso ? (
+                <button
+                  type="button"
+                  className="campeonatos-action campeonatos-action--primary"
+                  onClick={onReenviarVerificacao}
+                  disabled={reenviandoVerificacao}
+                >
+                  {reenviandoVerificacao ? "Reenviando..." : "Reenviar e-mail"}
+                </button>
+              ) : null}
+              <button type="button" className="auth-submit" onClick={fecharModalCadastroSucesso}>
+                Fechar
+              </button>
+            </div>
+
+            {mensagemReenvio ? (
+              <p
+                className={`auth-message ${mensagemReenvio.startsWith("Erro") ? "auth-message--error" : ""}`}
+                style={{ marginTop: 10 }}
+              >
+                {mensagemReenvio}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

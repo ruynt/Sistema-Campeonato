@@ -82,6 +82,21 @@ export async function loginParticipante(dados: { email: string; senha: string })
   });
 }
 
+export async function verificarEmail(token: string) {
+  return fazerRequisicao(`/usuarios/verificar-email?token=${encodeURIComponent(token)}`, {
+    method: "GET",
+    usarTokenAdmin: false
+  });
+}
+
+export async function reenviarVerificacao(email: string) {
+  return fazerRequisicao("/usuarios/reenviar-verificacao", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    usarTokenAdmin: false
+  });
+}
+
 export async function listarMinhasInscricoes(tokenParticipante: string | null) {
   return fazerRequisicao("/usuarios/minhas-inscricoes", {
     method: "GET",
