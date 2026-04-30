@@ -2,10 +2,10 @@ import { prisma } from "../banco/prisma.js";
 
 const TAMANHOS_CAMISA_VALIDOS = ["P", "M", "G", "GG"];
 
-// Por enquanto deixei R$ 20,00 como valor padrão.
+// Por enquanto deixei R$ 30,00 como valor padrão.
 // Depois, se o valor total com camisa for outro, basta alterar aqui.
 // Exemplo: R$ 50,00 = 5000.
-const VALOR_TOTAL_INSCRICAO_CENTAVOS = 2000;
+const VALOR_TOTAL_INSCRICAO_CENTAVOS = 3000;
 
 function obterLimiteMembrosPorTipo(tipoParticipante) {
   if (tipoParticipante === "DUPLA") {

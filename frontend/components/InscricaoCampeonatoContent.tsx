@@ -17,7 +17,7 @@ type ParticipanteLogado = {
   contato?: string | null;
 } | null;
 
-const VALOR_INSCRICAO_EXIBICAO = "R$ 20,00";
+const VALOR_INSCRICAO_EXIBICAO = "R$ 30,00";
 
 /** Valores aceitos pelo backend (enum TamanhoCamisa). */
 const TAMANHOS_CAMISA = [
