@@ -20,17 +20,31 @@
         <button id="aba-cadastro-participante" class="botao secundario" type="button">Cadastro</button>
       </div>
 
+      <div id="mensagem-participante" class="mensagem"></div>
+
       <form id="form-login-participante" class="formulario-auth">
         <h2>Entrar</h2>
 
         <div class="grupo-formulario">
           <label for="login-participante-email">E-mail</label>
-          <input type="email" id="login-participante-email" name="email" required />
+          <input
+            type="email"
+            id="login-participante-email"
+            name="email"
+            autocomplete="email"
+            required
+          />
         </div>
 
         <div class="grupo-formulario">
           <label for="login-participante-senha">Senha</label>
-          <input type="password" id="login-participante-senha" name="senha" required />
+          <input
+            type="password"
+            id="login-participante-senha"
+            name="senha"
+            autocomplete="current-password"
+            required
+          />
         </div>
 
         <button type="submit" class="botao">Entrar</button>
@@ -41,12 +55,24 @@
 
         <div class="grupo-formulario">
           <label for="cadastro-participante-nome">Nome</label>
-          <input type="text" id="cadastro-participante-nome" name="nome" required />
+          <input
+            type="text"
+            id="cadastro-participante-nome"
+            name="nome"
+            autocomplete="name"
+            required
+          />
         </div>
 
         <div class="grupo-formulario">
           <label for="cadastro-participante-email">E-mail</label>
-          <input type="email" id="cadastro-participante-email" name="email" required />
+          <input
+            type="email"
+            id="cadastro-participante-email"
+            name="email"
+            autocomplete="email"
+            required
+          />
         </div>
 
         <div class="grupo-formulario">
@@ -84,13 +110,17 @@
 
         <div class="grupo-formulario">
           <label for="cadastro-participante-senha">Senha</label>
-          <input type="password" id="cadastro-participante-senha" name="senha" required />
+          <input
+            type="password"
+            id="cadastro-participante-senha"
+            name="senha"
+            autocomplete="new-password"
+            required
+          />
         </div>
 
         <button type="submit" class="botao">Cadastrar</button>
       </form>
-
-      <p id="mensagem-participante" class="mensagem"></p>
     </section>
   </main>
 

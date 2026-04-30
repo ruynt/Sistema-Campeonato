@@ -53,8 +53,8 @@ formLogin.addEventListener("submit", async (event) => {
   const formData = new FormData(formLogin);
 
   const dados = {
-    email: formData.get("email"),
-    senha: formData.get("senha")
+    login: formData.get("login")?.toString().trim(),
+    senha: formData.get("senha")?.toString()
   };
 
   try {

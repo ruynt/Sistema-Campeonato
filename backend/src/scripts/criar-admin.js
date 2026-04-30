@@ -4,14 +4,47 @@ import { prisma } from "../banco/prisma.js";
 async function main() {
   const nome = "Administrador Principal";
   const email = "admin@plataforma.com";
+  const loginAdmin = "admin";
   const senha = "123456";
 
-  const usuarioExistente = await prisma.usuario.findUnique({
-    where: { email }
+  const usuarioComEmailExistente = await prisma.usuario.findUnique({
+    where: {
+      email
+    }
   });
 
-  if (usuarioExistente) {
-    console.log("Já existe um admin com esse e-mail.");
+  if (usuarioComEmailExistente) {
+    const adminAtualizado = await prisma.usuario.update({
+      where: {
+        id: usuarioComEmailExistente.id
+      },
+      data: {
+        loginAdmin,
+        emailVerificado: true
+      }
+    });
+
+    console.log("Já existia um usuário com esse e-mail. Admin atualizado com loginAdmin:");
+    console.log({
+      id: adminAtualizado.id,
+      nome: adminAtualizado.nome,
+      email: adminAtualizado.email,
+      loginAdmin: adminAtualizado.loginAdmin,
+      papel: adminAtualizado.papel,
+      emailVerificado: adminAtualizado.emailVerificado
+    });
+
+    return;
+  }
+
+  const usuarioComLoginExistente = await prisma.usuario.findUnique({
+    where: {
+      loginAdmin
+    }
+  });
+
+  if (usuarioComLoginExistente) {
+    console.log("Já existe um admin com esse usuário de login.");
     return;
   }
 
@@ -21,8 +54,10 @@ async function main() {
     data: {
       nome,
       email,
+      loginAdmin,
       senhaHash,
-      papel: "ADMIN"
+      papel: "ADMIN",
+      emailVerificado: true
     }
   });
 
@@ -31,7 +66,9 @@ async function main() {
     id: admin.id,
     nome: admin.nome,
     email: admin.email,
-    papel: admin.papel
+    loginAdmin: admin.loginAdmin,
+    papel: admin.papel,
+    emailVerificado: admin.emailVerificado
   });
 }
 
@@ -42,3 +79,6 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+  // para rodar use: node src/scripts/criarAdmin.js
+  

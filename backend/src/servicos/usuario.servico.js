@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { prisma } from "../banco/prisma.js";
+import emailServico from "./email.servico.js";
 
 function montarUsuarioRetorno(usuario) {
   return {
@@ -12,7 +14,8 @@ function montarUsuarioRetorno(usuario) {
     sexo: usuario.sexo,
     fotoPerfil: usuario.fotoPerfil,
     papel: usuario.papel,
-    criadoEm: usuario.criadoEm
+    criadoEm: usuario.criadoEm,
+    emailVerificado: usuario.emailVerificado
   };
 }
 
@@ -25,8 +28,31 @@ const selectUsuarioPublico = {
   sexo: true,
   fotoPerfil: true,
   papel: true,
-  criadoEm: true
+  criadoEm: true,
+  emailVerificado: true
 };
+
+function normalizarEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function gerarTokenVerificacaoEmail() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function gerarDataExpiracaoToken() {
+  const agora = new Date();
+  agora.setHours(agora.getHours() + 24);
+  return agora;
+}
+
+function prepararDataNascimento(dataNascimento) {
+  if (!dataNascimento) {
+    return null;
+  }
+
+  return new Date(dataNascimento);
+}
 
 async function cadastrarParticipante({
   nome,
@@ -36,8 +62,12 @@ async function cadastrarParticipante({
   dataNascimento,
   sexo
 }) {
+  const emailNormalizado = normalizarEmail(email);
+
   const usuarioExistente = await prisma.usuario.findUnique({
-    where: { email }
+    where: {
+      email: emailNormalizado
+    }
   });
 
   if (usuarioExistente) {
@@ -45,25 +75,121 @@ async function cadastrarParticipante({
   }
 
   const senhaHash = await bcrypt.hash(senha, 10);
+  const tokenVerificacaoEmail = gerarTokenVerificacaoEmail();
+  const tokenVerificacaoExpiraEm = gerarDataExpiracaoToken();
 
   const usuario = await prisma.usuario.create({
     data: {
       nome,
-      email,
+      email: emailNormalizado,
       contato,
-      dataNascimento: new Date(dataNascimento),
+      dataNascimento: prepararDataNascimento(dataNascimento),
       sexo: sexo || null,
       senhaHash,
-      papel: "PARTICIPANTE"
+      papel: "PARTICIPANTE",
+      emailVerificado: false,
+      tokenVerificacaoEmail,
+      tokenVerificacaoExpiraEm
     }
+  });
+
+  await emailServico.enviarEmailVerificacao({
+    nome: usuario.nome,
+    email: usuario.email,
+    token: tokenVerificacaoEmail
   });
 
   return montarUsuarioRetorno(usuario);
 }
 
-async function loginUsuario({ email, senha }) {
+async function verificarEmail(token) {
+  if (!token) {
+    throw new Error("Token de verificação não informado.");
+  }
+
   const usuario = await prisma.usuario.findUnique({
-    where: { email }
+    where: {
+      tokenVerificacaoEmail: token
+    }
+  });
+
+  if (!usuario) {
+    throw new Error("Token de verificação inválido.");
+  }
+
+  if (usuario.emailVerificado) {
+    return montarUsuarioRetorno(usuario);
+  }
+
+  if (
+    usuario.tokenVerificacaoExpiraEm &&
+    usuario.tokenVerificacaoExpiraEm < new Date()
+  ) {
+    throw new Error("Token de verificação expirado. Solicite um novo e-mail de verificação.");
+  }
+
+  const usuarioAtualizado = await prisma.usuario.update({
+    where: {
+      id: usuario.id
+    },
+    data: {
+      emailVerificado: true,
+      tokenVerificacaoEmail: null,
+      tokenVerificacaoExpiraEm: null
+    }
+  });
+
+  return montarUsuarioRetorno(usuarioAtualizado);
+}
+
+async function reenviarEmailVerificacao(email) {
+  const emailNormalizado = normalizarEmail(email);
+
+  const usuario = await prisma.usuario.findUnique({
+    where: {
+      email: emailNormalizado
+    }
+  });
+
+  if (!usuario) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  if (usuario.emailVerificado) {
+    throw new Error("Este e-mail já foi verificado.");
+  }
+
+  const tokenVerificacaoEmail = gerarTokenVerificacaoEmail();
+  const tokenVerificacaoExpiraEm = gerarDataExpiracaoToken();
+
+  const usuarioAtualizado = await prisma.usuario.update({
+    where: {
+      id: usuario.id
+    },
+    data: {
+      tokenVerificacaoEmail,
+      tokenVerificacaoExpiraEm
+    }
+  });
+
+  await emailServico.enviarEmailVerificacao({
+    nome: usuarioAtualizado.nome,
+    email: usuarioAtualizado.email,
+    token: tokenVerificacaoEmail
+  });
+
+  return {
+    mensagem: "E-mail de verificação reenviado com sucesso."
+  };
+}
+
+async function loginUsuario({ email, senha }) {
+  const emailNormalizado = normalizarEmail(email);
+
+  const usuario = await prisma.usuario.findUnique({
+    where: {
+      email: emailNormalizado
+    }
   });
 
   if (!usuario) {
@@ -74,6 +200,10 @@ async function loginUsuario({ email, senha }) {
 
   if (!senhaCorreta) {
     throw new Error("E-mail ou senha inválidos.");
+  }
+
+  if (usuario.papel === "PARTICIPANTE" && !usuario.emailVerificado) {
+    throw new Error("Verifique seu e-mail antes de entrar no sistema.");
   }
 
   const token = jwt.sign(
@@ -166,7 +296,7 @@ async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento, sexo 
     data: {
       nome,
       contato,
-      dataNascimento: new Date(dataNascimento),
+      dataNascimento: prepararDataNascimento(dataNascimento),
       sexo: sexo || null
     },
     select: selectUsuarioPublico
@@ -177,6 +307,8 @@ async function atualizarPerfil(usuarioId, { nome, contato, dataNascimento, sexo 
 
 export default {
   cadastrarParticipante,
+  verificarEmail,
+  reenviarEmailVerificacao,
   loginUsuario,
   listarMinhasInscricoes,
   buscarPerfil,

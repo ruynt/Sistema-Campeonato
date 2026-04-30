@@ -38,7 +38,53 @@ async function cadastro(req, res) {
       sexo
     });
 
-    return res.status(201).json(usuario);
+    return res.status(201).json({
+      mensagem: "Cadastro realizado com sucesso. Verifique seu e-mail para ativar sua conta.",
+      usuario
+    });
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function verificarEmail(req, res) {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        erro: "Token de verificação não informado."
+      });
+    }
+
+    const usuario = await usuarioServico.verificarEmail(token);
+
+    return res.json({
+      mensagem: "E-mail verificado com sucesso. Agora você já pode entrar no sistema.",
+      usuario
+    });
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function reenviarEmailVerificacao(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        erro: "E-mail é obrigatório."
+      });
+    }
+
+    const resultado = await usuarioServico.reenviarEmailVerificacao(email);
+
+    return res.json(resultado);
   } catch (error) {
     return res.status(400).json({
       erro: error.message
@@ -145,6 +191,8 @@ async function atualizarPerfil(req, res) {
 
 export default {
   cadastro,
+  verificarEmail,
+  reenviarEmailVerificacao,
   login,
   minhasInscricoes,
   perfil,

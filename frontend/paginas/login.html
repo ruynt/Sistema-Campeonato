@@ -10,7 +10,7 @@
   <main class="container">
     <header class="cabecalho">
       <h1>Acesso Administrativo</h1>
-      <p>Entre com sua conta de administrador para gerenciar os campeonatos da plataforma.</p>
+      <p>Entre com seu usuário de administrador para gerenciar os campeonatos da plataforma.</p>
       <a href="./campeonatos-publicos.html" class="link-voltar">← Ir para campeonatos públicos</a>
     </header>
 
@@ -23,13 +23,25 @@
         <h2>Entrar</h2>
 
         <div class="grupo-formulario">
-          <label for="login-email">E-mail</label>
-          <input type="email" id="login-email" name="email" required />
+          <label for="login-admin-usuario">Usuário</label>
+          <input
+            type="text"
+            id="login-admin-usuario"
+            name="login"
+            autocomplete="username"
+            required
+          />
         </div>
 
         <div class="grupo-formulario">
           <label for="login-senha">Senha</label>
-          <input type="password" id="login-senha" name="senha" required />
+          <input
+            type="password"
+            id="login-senha"
+            name="senha"
+            autocomplete="current-password"
+            required
+          />
         </div>
 
         <button type="submit" class="botao">Entrar</button>

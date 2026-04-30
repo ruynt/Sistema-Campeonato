@@ -88,6 +88,7 @@ model Usuario {
   id             Int          @id @default(autoincrement())
   nome           String
   email          String       @unique
+  loginAdmin     String?      @unique
   contato        String?
   dataNascimento DateTime?
   sexo           SexoUsuario?
@@ -95,6 +96,10 @@ model Usuario {
   senhaHash      String
   papel          PapelUsuario
   criadoEm       DateTime     @default(now())
+
+  emailVerificado          Boolean   @default(false)
+  tokenVerificacaoEmail    String?   @unique
+  tokenVerificacaoExpiraEm DateTime?
 
   inscricoes            Participante[]
   inscricoesIndividuais InscricaoIndividual[]

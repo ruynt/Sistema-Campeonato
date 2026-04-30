@@ -2,29 +2,39 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../banco/prisma.js";
 
-async function loginAdmin({ email, senha }) {
-  const usuario = await prisma.usuario.findUnique({
-    where: { email }
+function normalizarLoginAdmin(login) {
+  return String(login || "").trim().toLowerCase();
+}
+
+async function loginAdmin({ login, senha }) {
+  const loginTratado = normalizarLoginAdmin(login);
+
+  if (!loginTratado || !senha) {
+    throw new Error("Usuário e senha são obrigatórios.");
+  }
+
+  const usuario = await prisma.usuario.findFirst({
+    where: {
+      loginAdmin: loginTratado,
+      papel: "ADMIN"
+    }
   });
 
   if (!usuario) {
-    throw new Error("E-mail ou senha inválidos.");
-  }
-
-  if (usuario.papel !== "ADMIN") {
-    throw new Error("Acesso permitido apenas para administradores.");
+    throw new Error("Usuário ou senha inválidos.");
   }
 
   const senhaCorreta = await bcrypt.compare(senha, usuario.senhaHash);
 
   if (!senhaCorreta) {
-    throw new Error("E-mail ou senha inválidos.");
+    throw new Error("Usuário ou senha inválidos.");
   }
 
   const token = jwt.sign(
     {
       id: usuario.id,
       email: usuario.email,
+      loginAdmin: usuario.loginAdmin,
       papel: usuario.papel
     },
     process.env.JWT_SECRET,
@@ -37,6 +47,7 @@ async function loginAdmin({ email, senha }) {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
+      loginAdmin: usuario.loginAdmin,
       papel: usuario.papel
     }
   };

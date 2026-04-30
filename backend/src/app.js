@@ -9,6 +9,7 @@ import podioRotas from "./rotas/podio.rotas.js";
 import resumoRotas from "./rotas/resumo.rotas.js";
 import usuarioRotas from "./rotas/usuario.rotas.js";
 import equipeRotas from "./rotas/equipe.rotas.js";
+import adminRotas from "./rotas/admin.rotas.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/admin", adminRotas);
 app.use("/usuarios", usuarioRotas);
 app.use("/campeonatos", campeonatoRotas);
 app.use("/campeonatos", inscricaoRotas);
