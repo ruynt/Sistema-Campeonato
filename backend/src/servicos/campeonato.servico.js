@@ -7,6 +7,27 @@ const FORMATOS_VALIDOS = [
   "GRUPOS_3X4_REPESCAGEM"
 ];
 
+const MODOS_INSCRICAO_VALIDOS = [
+  "POR_EQUIPE",
+  "INDIVIDUAL"
+];
+
+function valorFoiEnviado(valor) {
+  return valor !== undefined && valor !== null && valor !== "";
+}
+
+function obterTamanhoEquipe(tipoParticipante) {
+  if (tipoParticipante === "DUPLA") {
+    return 2;
+  }
+
+  if (tipoParticipante === "TIME") {
+    return 4;
+  }
+
+  throw new Error("Tipo de participante inválido.");
+}
+
 function validarFormatoCampeonato(formato) {
   if (!formato) {
     return "MATA_MATA";
@@ -19,16 +40,28 @@ function validarFormatoCampeonato(formato) {
   return formato;
 }
 
-function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
-  if (formato === "GRUPOS_3X4_REPESCAGEM") {
-    return 12;
+function validarModoInscricao(modoInscricao) {
+  if (!modoInscricao) {
+    return "POR_EQUIPE";
   }
 
+  if (!MODOS_INSCRICAO_VALIDOS.includes(modoInscricao)) {
+    throw new Error("Modo de inscrição inválido.");
+  }
+
+  return modoInscricao;
+}
+
+function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
   if (
     quantidadeMaxima === null ||
     quantidadeMaxima === undefined ||
     quantidadeMaxima === ""
   ) {
+    if (formato === "GRUPOS_3X4_REPESCAGEM") {
+      return 12;
+    }
+
     return null;
   }
 
@@ -38,7 +71,21 @@ function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
     throw new Error("A quantidade máxima precisa ser um número maior ou igual a 2.");
   }
 
+  if (formato === "GRUPOS_3X4_REPESCAGEM" && ![8, 12].includes(quantidade)) {
+    throw new Error(
+      "No formato com fase de grupos, a quantidade máxima precisa ser 8 ou 12."
+    );
+  }
+
   return quantidade;
+}
+
+function contarInscricoesIndividuaisAprovadas(inscricoesIndividuais) {
+  return inscricoesIndividuais.filter(
+    (inscricao) =>
+      inscricao.status !== "CANCELADA" &&
+      inscricao.statusAnalise === "APROVADA"
+  ).length;
 }
 
 async function criar(dados) {
@@ -49,10 +96,13 @@ async function criar(dados) {
     tipoParticipante,
     categoria,
     formato,
+    modoInscricao,
     quantidadeMaxima
   } = dados;
 
   const formatoValidado = validarFormatoCampeonato(formato);
+  const modoInscricaoValidado = validarModoInscricao(modoInscricao);
+
   const quantidadeMaximaTratada = prepararQuantidadeMaxima(
     formatoValidado,
     quantidadeMaxima
@@ -66,6 +116,7 @@ async function criar(dados) {
       tipoParticipante,
       categoria,
       formato: formatoValidado,
+      modoInscricao: modoInscricaoValidado,
       quantidadeMaxima: quantidadeMaximaTratada
     }
   });
@@ -97,6 +148,7 @@ async function listarPublicos() {
   const campeonatos = await prisma.campeonato.findMany({
     include: {
       participantes: true,
+      inscricoesIndividuais: true,
       jogos: {
         include: {
           vencedor: true
@@ -110,6 +162,9 @@ async function listarPublicos() {
 
   return campeonatos.map((campeonato) => {
     const totalParticipantes = campeonato.participantes.length;
+    const totalInscricoesIndividuaisAprovadas =
+      contarInscricoesIndividuaisAprovadas(campeonato.inscricoesIndividuais);
+
     const totalJogos = campeonato.jogos.length;
     const jogosFinalizados = campeonato.jogos.filter(
       (jogo) => jogo.status === "FINALIZADO"
@@ -144,11 +199,13 @@ async function listarPublicos() {
       tipoParticipante: campeonato.tipoParticipante,
       categoria: campeonato.categoria,
       formato: campeonato.formato,
+      modoInscricao: campeonato.modoInscricao,
       quantidadeMaxima: campeonato.quantidadeMaxima,
       inscricoesAbertas: campeonato.inscricoesAbertas,
       criadoEm: campeonato.criadoEm,
       totais: {
         participantes: totalParticipantes,
+        inscricoesIndividuais: totalInscricoesIndividuaisAprovadas,
         jogos: totalJogos,
         jogosFinalizados
       },
@@ -161,21 +218,6 @@ async function buscarPorId(id) {
   const campeonato = await prisma.campeonato.findUnique({
     where: {
       id: Number(id)
-    },
-    include: {
-      participantes: {
-        include: {
-          jogadores: true
-        }
-      },
-      jogos: {
-        include: {
-          equipeA: true,
-          equipeB: true,
-          vencedor: true,
-          sets: true
-        }
-      }
     }
   });
 
@@ -190,6 +232,7 @@ async function atualizar(id, dados) {
     tipoParticipante,
     categoria,
     formato,
+    modoInscricao,
     quantidadeMaxima
   } = dados;
 
@@ -210,26 +253,89 @@ async function atualizar(id, dados) {
     throw new Error("Não é permitido editar o campeonato após o chaveamento ter sido gerado.");
   }
 
-  const formatoValidado = validarFormatoCampeonato(formato);
-  const quantidadeMaximaTratada = prepararQuantidadeMaxima(
-    formatoValidado,
-    quantidadeMaxima
-  );
-
-  const totalInscritos = await prisma.participante.count({
+  const totalEquipesInscritas = await prisma.participante.count({
     where: {
       campeonatoId: Number(id)
     }
   });
 
+  const totalInscricoesIndividuaisAtivas = await prisma.inscricaoIndividual.count({
+    where: {
+      campeonatoId: Number(id),
+      status: {
+        not: "CANCELADA"
+      }
+    }
+  });
+
+  const possuiInscricoes =
+    totalEquipesInscritas > 0 || totalInscricoesIndividuaisAtivas > 0;
+
+  const nomeFinal = valorFoiEnviado(nome) ? nome : campeonato.nome;
+  const dataFinal = data !== undefined ? (data ? new Date(data) : null) : campeonato.data;
+  const localFinal = local !== undefined ? (local || null) : campeonato.local;
+
+  const tipoParticipanteFinal = valorFoiEnviado(tipoParticipante)
+    ? tipoParticipante
+    : campeonato.tipoParticipante;
+
+  const categoriaFinal = valorFoiEnviado(categoria)
+    ? categoria
+    : campeonato.categoria;
+
+  const formatoFinal = valorFoiEnviado(formato)
+    ? validarFormatoCampeonato(formato)
+    : campeonato.formato;
+
+  const modoInscricaoFinal = valorFoiEnviado(modoInscricao)
+    ? validarModoInscricao(modoInscricao)
+    : campeonato.modoInscricao;
+
+  if (possuiInscricoes) {
+    if (tipoParticipanteFinal !== campeonato.tipoParticipante) {
+      throw new Error("Não é permitido alterar o tipo após existirem inscrições.");
+    }
+
+    if (categoriaFinal !== campeonato.categoria) {
+      throw new Error("Não é permitido alterar a categoria após existirem inscrições.");
+    }
+
+    if (formatoFinal !== campeonato.formato) {
+      throw new Error("Não é permitido alterar o formato após existirem inscrições.");
+    }
+
+    if (modoInscricaoFinal !== campeonato.modoInscricao) {
+      throw new Error("Não é permitido alterar o modo de inscrição após existirem inscrições.");
+    }
+  }
+
+  const quantidadeMaximaTratada = quantidadeMaxima !== undefined
+    ? prepararQuantidadeMaxima(formatoFinal, quantidadeMaxima)
+    : campeonato.quantidadeMaxima;
+
   if (
     quantidadeMaximaTratada !== null &&
     quantidadeMaximaTratada !== undefined &&
-    quantidadeMaximaTratada < totalInscritos
+    quantidadeMaximaTratada < totalEquipesInscritas
   ) {
     throw new Error(
-      `A quantidade máxima não pode ser menor que o total atual de inscritos (${totalInscritos}).`
+      `A quantidade máxima não pode ser menor que o total atual de equipes inscritas (${totalEquipesInscritas}).`
     );
+  }
+
+  if (
+    modoInscricaoFinal === "INDIVIDUAL" &&
+    quantidadeMaximaTratada !== null &&
+    quantidadeMaximaTratada !== undefined
+  ) {
+    const tamanhoEquipe = obterTamanhoEquipe(tipoParticipanteFinal);
+    const limiteJogadoresIndividuais = quantidadeMaximaTratada * tamanhoEquipe;
+
+    if (totalInscricoesIndividuaisAtivas > limiteJogadoresIndividuais) {
+      throw new Error(
+        `A quantidade máxima informada permite apenas ${limiteJogadoresIndividuais} jogadores individuais, mas já existem ${totalInscricoesIndividuaisAtivas} inscritos.`
+      );
+    }
   }
 
   const campeonatoAtualizado = await prisma.campeonato.update({
@@ -237,12 +343,13 @@ async function atualizar(id, dados) {
       id: Number(id)
     },
     data: {
-      nome,
-      data: data ? new Date(data) : null,
-      local: local || null,
-      tipoParticipante,
-      categoria,
-      formato: formatoValidado,
+      nome: nomeFinal,
+      data: dataFinal,
+      local: localFinal,
+      tipoParticipante: tipoParticipanteFinal,
+      categoria: categoriaFinal,
+      formato: formatoFinal,
+      modoInscricao: modoInscricaoFinal,
       quantidadeMaxima: quantidadeMaximaTratada
     }
   });
@@ -254,6 +361,11 @@ async function excluir(id) {
   const campeonato = await prisma.campeonato.findUnique({
     where: {
       id: Number(id)
+    },
+    include: {
+      jogos: true,
+      participantes: true,
+      inscricoesIndividuais: true
     }
   });
 
@@ -261,10 +373,49 @@ async function excluir(id) {
     throw new Error("Campeonato não encontrado.");
   }
 
-  await prisma.campeonato.delete({
-    where: {
-      id: Number(id)
+  if (campeonato.jogos.length > 0) {
+    throw new Error("Não é permitido excluir o campeonato após o chaveamento ter sido gerado.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const participantes = await tx.participante.findMany({
+      where: {
+        campeonatoId: Number(id)
+      },
+      select: {
+        id: true
+      }
+    });
+
+    const participanteIds = participantes.map((participante) => participante.id);
+
+    await tx.inscricaoIndividual.deleteMany({
+      where: {
+        campeonatoId: Number(id)
+      }
+    });
+
+    if (participanteIds.length > 0) {
+      await tx.jogador.deleteMany({
+        where: {
+          participanteId: {
+            in: participanteIds
+          }
+        }
+      });
     }
+
+    await tx.participante.deleteMany({
+      where: {
+        campeonatoId: Number(id)
+      }
+    });
+
+    await tx.campeonato.delete({
+      where: {
+        id: Number(id)
+      }
+    });
   });
 
   return { mensagem: "Campeonato excluído com sucesso." };

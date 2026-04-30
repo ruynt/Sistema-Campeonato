@@ -1,6 +1,7 @@
 import {
   buscarCampeonatoPorId,
   criarInscricao,
+  criarInscricaoIndividual,
   listarMinhasEquipes,
   criarEquipe,
   gerarConviteEquipe,
@@ -14,6 +15,11 @@ const dadosCampeonatoPublico = document.getElementById("dados-campeonato-publico
 const formInscricao = document.getElementById("form-inscricao");
 const jogadoresContainer = document.getElementById("jogadores-container");
 const mensagemInscricao = document.getElementById("mensagem-inscricao");
+
+const CAMINHO_QR_CODE_PAGAMENTO = "../assets/imagens/qr-pagamento-inscricao.png";
+const VALOR_TOTAL_INSCRICAO_FORMATADO = "R$ 20,00";
+const TAMANHOS_CAMISA_VALIDOS = ["P", "M", "G", "GG"];
+const TAMANHO_MAXIMO_COMPROVANTE_MB = 5;
 
 let campeonatoAtual = null;
 let equipesDoParticipante = [];
@@ -83,6 +89,15 @@ function formatarData(data) {
   });
 }
 
+function formatarTamanhoArquivo(bytes) {
+  if (!bytes && bytes !== 0) {
+    return "";
+  }
+
+  const tamanhoMb = bytes / (1024 * 1024);
+  return `${tamanhoMb.toFixed(2)} MB`;
+}
+
 function traduzirTipoParticipante(tipo) {
   const mapa = {
     DUPLA: "Dupla",
@@ -111,6 +126,56 @@ function traduzirSexo(sexo) {
   return mapa[sexo] || "Não informado";
 }
 
+function traduzirModoInscricao(modoInscricao) {
+  const mapa = {
+    POR_EQUIPE: "Por equipe",
+    INDIVIDUAL: "Individual"
+  };
+
+  return mapa[modoInscricao] || "Por equipe";
+}
+
+function validarArquivoComprovante(arquivo) {
+  if (!arquivo) {
+    throw new Error("Envie o comprovante de pagamento.");
+  }
+
+  const tiposPermitidos = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp"
+  ];
+
+  if (!tiposPermitidos.includes(arquivo.type)) {
+    throw new Error("O comprovante precisa ser uma imagem PNG, JPG, JPEG ou WEBP.");
+  }
+
+  const tamanhoMaximoBytes = TAMANHO_MAXIMO_COMPROVANTE_MB * 1024 * 1024;
+
+  if (arquivo.size > tamanhoMaximoBytes) {
+    throw new Error(
+      `O comprovante precisa ter no máximo ${TAMANHO_MAXIMO_COMPROVANTE_MB} MB.`
+    );
+  }
+}
+
+function converterArquivoParaBase64(arquivo) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+
+    leitor.onload = () => {
+      resolve(leitor.result);
+    };
+
+    leitor.onerror = () => {
+      reject(new Error("Não foi possível ler o arquivo do comprovante."));
+    };
+
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
 function renderizarCabecalhoCampeonato(campeonato) {
   dadosCampeonatoPublico.innerHTML = `
     <div class="bloco-informacoes">
@@ -119,6 +184,7 @@ function renderizarCabecalhoCampeonato(campeonato) {
       <p><strong>Local:</strong> ${campeonato.local || "Não informado"}</p>
       <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
       <p><strong>Categoria:</strong> ${traduzirCategoria(campeonato.categoria)}</p>
+      <p><strong>Forma de inscrição:</strong> ${traduzirModoInscricao(campeonato.modoInscricao)}</p>
       <p><strong>Inscrições abertas:</strong> ${campeonato.inscricoesAbertas ? "Sim" : "Não"}</p>
     </div>
   `;
@@ -472,6 +538,114 @@ function renderizarCriacaoEquipe() {
   `;
 }
 
+function renderizarFormularioInscricaoIndividual() {
+  jogadoresContainer.innerHTML = "";
+
+  formInscricao.innerHTML = `
+    <div class="area-edicao-inscricao" style="grid-column: 1 / -1;">
+      <h4>Inscrição individual</h4>
+
+      <p class="info-auxiliar">
+        Neste campeonato, você se inscreve sozinho(a). Depois do envio, a organização vai analisar o comprovante de pagamento e formar as equipes manualmente.
+      </p>
+
+      <p>
+        <strong>Tipo do campeonato:</strong> ${traduzirTipoParticipante(campeonatoAtual.tipoParticipante)}
+      </p>
+
+      <p>
+        <strong>Categoria:</strong> ${traduzirCategoria(campeonatoAtual.categoria)}
+      </p>
+
+      <div class="area-edicao-inscricao" style="margin-top: 16px; border-color: #bfdbfe; background: #eff6ff;">
+        <h4>Pagamento da inscrição</h4>
+
+        <p>
+          <strong>Valor total:</strong> ${VALOR_TOTAL_INSCRICAO_FORMATADO}
+        </p>
+
+        <p class="info-auxiliar">
+          O valor inclui a inscrição e a camisa do campeonato.
+        </p>
+
+        <div style="margin: 14px 0;">
+          <p><strong>QR Code para pagamento:</strong></p>
+
+          <img
+            src="${CAMINHO_QR_CODE_PAGAMENTO}"
+            alt="QR Code para pagamento da inscrição"
+            style="width: 220px; max-width: 100%; border: 1px solid #bfdbfe; border-radius: 12px; background: #ffffff; padding: 10px; margin-top: 8px;"
+          />
+
+          <p class="info-auxiliar" style="margin-top: 8px;">
+            Após pagar, envie abaixo a imagem do comprovante.
+          </p>
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="tamanho-camisa">Tamanho da camisa</label>
+          <select id="tamanho-camisa" name="tamanhoCamisa" required>
+            <option value="">Selecione o tamanho</option>
+            <option value="P">P</option>
+            <option value="M">M</option>
+            <option value="G">G</option>
+            <option value="GG">GG</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="comprovante-pagamento">Comprovante de pagamento</label>
+          <input
+            type="file"
+            id="comprovante-pagamento"
+            name="comprovantePagamento"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            required
+          />
+
+          <small class="texto-ajuda">
+            Envie uma imagem em PNG, JPG, JPEG ou WEBP, com no máximo ${TAMANHO_MAXIMO_COMPROVANTE_MB} MB.
+          </small>
+
+          <p id="arquivo-comprovante-info" class="info-auxiliar" style="margin-top: 8px;"></p>
+        </div>
+      </div>
+
+      <button type="submit" class="botao" style="margin-top: 14px;">
+        Enviar inscrição para análise
+      </button>
+    </div>
+  `;
+
+  conectarEventosInscricaoIndividual();
+}
+
+function renderizarInscricaoIndividualConfirmada() {
+  formInscricao.innerHTML = `
+    <div class="area-edicao-inscricao" style="grid-column: 1 / -1; border-color: #86efac; background: #dcfce7;">
+      <h4>Inscrição enviada para análise</h4>
+
+      <p>
+        Sua solicitação de inscrição individual foi enviada com sucesso.
+      </p>
+
+      <p class="info-auxiliar">
+        Agora aguarde a organização conferir o comprovante de pagamento. Depois da aprovação, seu nome será liberado para a formação das equipes.
+      </p>
+
+      <div class="acoes-card">
+        <a href="./campeonatos-publicos.html" class="botao-pequeno">
+          Voltar aos campeonatos
+        </a>
+
+        <a href="./perfil-participante.html" class="botao-pequeno secundario">
+          Ir para meu perfil
+        </a>
+      </div>
+    </div>
+  `;
+}
+
 function renderizarFormularioSomenteEquipe() {
   const equipesCompativeis = obterEquipesCompativeis();
 
@@ -543,6 +717,47 @@ function renderizarFormularioSomenteEquipe() {
   `;
 
   conectarEventosTela();
+}
+
+function renderizarFormularioInscricao() {
+  const modoInscricao = campeonatoAtual?.modoInscricao || "POR_EQUIPE";
+
+  if (modoInscricao === "INDIVIDUAL") {
+    renderizarFormularioInscricaoIndividual();
+    return;
+  }
+
+  renderizarFormularioSomenteEquipe();
+}
+
+function conectarEventosInscricaoIndividual() {
+  const inputComprovante = document.getElementById("comprovante-pagamento");
+  const arquivoInfo = document.getElementById("arquivo-comprovante-info");
+
+  if (!inputComprovante || !arquivoInfo) {
+    return;
+  }
+
+  inputComprovante.addEventListener("change", () => {
+    const arquivo = inputComprovante.files?.[0];
+
+    if (!arquivo) {
+      arquivoInfo.textContent = "";
+      return;
+    }
+
+    try {
+      validarArquivoComprovante(arquivo);
+
+      arquivoInfo.textContent = `Arquivo selecionado: ${arquivo.name} (${formatarTamanhoArquivo(arquivo.size)})`;
+      arquivoInfo.style.color = "#166534";
+      arquivoInfo.style.fontWeight = "700";
+    } catch (error) {
+      inputComprovante.value = "";
+      arquivoInfo.textContent = "";
+      mostrarMensagemInscricao(error.message, "erro");
+    }
+  });
 }
 
 function conectarEventosTela() {
@@ -721,10 +936,13 @@ async function carregarCampeonato() {
 
   try {
     campeonatoAtual = await buscarCampeonatoPorId(campeonatoId);
-    await carregarEquipesDoParticipante();
+
+    if ((campeonatoAtual.modoInscricao || "POR_EQUIPE") === "POR_EQUIPE") {
+      await carregarEquipesDoParticipante();
+    }
 
     renderizarCabecalhoCampeonato(campeonatoAtual);
-    renderizarFormularioSomenteEquipe();
+    renderizarFormularioInscricao();
 
     if (!campeonatoAtual.inscricoesAbertas) {
       mostrarMensagemInscricao("As inscrições deste campeonato estão encerradas.", "erro");
@@ -738,6 +956,50 @@ async function carregarCampeonato() {
 
 formInscricao.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  const modoInscricao = campeonatoAtual?.modoInscricao || "POR_EQUIPE";
+
+  if (modoInscricao === "INDIVIDUAL") {
+    const selectTamanhoCamisa = document.getElementById("tamanho-camisa");
+    const inputComprovante = document.getElementById("comprovante-pagamento");
+
+    const tamanhoCamisa = selectTamanhoCamisa?.value;
+    const arquivoComprovante = inputComprovante?.files?.[0];
+
+    if (!TAMANHOS_CAMISA_VALIDOS.includes(tamanhoCamisa)) {
+      mostrarMensagemInscricao("Selecione o tamanho da camisa.", "erro");
+      return;
+    }
+
+    try {
+      validarArquivoComprovante(arquivoComprovante);
+    } catch (error) {
+      mostrarMensagemInscricao(error.message, "erro");
+      return;
+    }
+
+    mostrarMensagemInscricao("Enviando inscrição individual para análise...", "info");
+
+    try {
+      const comprovantePagamento = await converterArquivoParaBase64(arquivoComprovante);
+
+      await criarInscricaoIndividual(campeonatoId, {
+        tamanhoCamisa,
+        comprovantePagamento
+      });
+
+      renderizarInscricaoIndividualConfirmada();
+
+      mostrarMensagemInscricao(
+        "Inscrição enviada para análise com sucesso!",
+        "sucesso"
+      );
+    } catch (error) {
+      mostrarMensagemInscricao(`Erro ao enviar inscrição individual: ${error.message}`, "erro");
+    }
+
+    return;
+  }
 
   mostrarMensagemInscricao("Enviando inscrição...", "info");
 

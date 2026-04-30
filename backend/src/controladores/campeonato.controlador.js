@@ -11,7 +11,18 @@ const FORMATOS_VALIDOS = [
   "GRUPOS_3X4_REPESCAGEM"
 ];
 
-function validarDadosCampeonato({ nome, tipoParticipante, categoria, formato }) {
+const MODOS_INSCRICAO_VALIDOS = [
+  "POR_EQUIPE",
+  "INDIVIDUAL"
+];
+
+function validarDadosCampeonato({
+  nome,
+  tipoParticipante,
+  categoria,
+  formato,
+  modoInscricao
+}) {
   if (!nome || !tipoParticipante || !categoria) {
     return "Nome, tipoParticipante e categoria são obrigatórios.";
   }
@@ -28,6 +39,10 @@ function validarDadosCampeonato({ nome, tipoParticipante, categoria, formato }) 
     return "formato inválido. Use MATA_MATA, DUPLA_ELIMINACAO, TODOS_CONTRA_TODOS ou GRUPOS_3X4_REPESCAGEM.";
   }
 
+  if (modoInscricao && !MODOS_INSCRICAO_VALIDOS.includes(modoInscricao)) {
+    return "modoInscricao inválido. Use POR_EQUIPE ou INDIVIDUAL.";
+  }
+
   return null;
 }
 
@@ -40,6 +55,7 @@ async function criar(req, res) {
       tipoParticipante,
       categoria,
       formato,
+      modoInscricao,
       quantidadeMaxima
     } = req.body;
 
@@ -47,7 +63,8 @@ async function criar(req, res) {
       nome,
       tipoParticipante,
       categoria,
-      formato
+      formato,
+      modoInscricao
     });
 
     if (erroValidacao) {
@@ -63,14 +80,14 @@ async function criar(req, res) {
       tipoParticipante,
       categoria,
       formato,
+      modoInscricao,
       quantidadeMaxima
     });
 
     return res.status(201).json(campeonato);
   } catch (error) {
-    return res.status(500).json({
-      erro: "Erro ao criar campeonato.",
-      detalhe: error.message
+    return res.status(400).json({
+      erro: error.message
     });
   }
 }
@@ -156,6 +173,7 @@ async function atualizar(req, res) {
       tipoParticipante,
       categoria,
       formato,
+      modoInscricao,
       quantidadeMaxima
     } = req.body;
 
@@ -163,7 +181,8 @@ async function atualizar(req, res) {
       nome,
       tipoParticipante,
       categoria,
-      formato
+      formato,
+      modoInscricao
     });
 
     if (erroValidacao) {
@@ -179,6 +198,7 @@ async function atualizar(req, res) {
       tipoParticipante,
       categoria,
       formato,
+      modoInscricao,
       quantidadeMaxima
     });
 

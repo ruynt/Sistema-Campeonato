@@ -25,6 +25,14 @@ function converterSexoParaGenero(sexo) {
   return null;
 }
 
+function validarCampeonatoPermiteInscricaoPorEquipe(campeonato) {
+  if (campeonato.modoInscricao !== "POR_EQUIPE") {
+    throw new Error(
+      "Este campeonato usa inscrição individual. Não é permitido inscrever uma equipe diretamente."
+    );
+  }
+}
+
 function montarJogadoresAPartirDaEquipe(equipe) {
   return equipe.membros.map((membro) => {
     const genero = converterSexoParaGenero(membro.usuario?.sexo);
@@ -142,6 +150,8 @@ async function inscreverComEquipe(campeonatoId, equipeId, usuarioId) {
     throw new Error("Campeonato não encontrado.");
   }
 
+  validarCampeonatoPermiteInscricaoPorEquipe(campeonato);
+
   if (!campeonato.inscricoesAbertas) {
     throw new Error("As inscrições deste campeonato estão encerradas.");
   }
@@ -253,6 +263,8 @@ async function inscreverManual(campeonatoId, dados, usuarioId = null) {
   if (!campeonato) {
     throw new Error("Campeonato não encontrado.");
   }
+
+  validarCampeonatoPermiteInscricaoPorEquipe(campeonato);
 
   if (!campeonato.inscricoesAbertas) {
     throw new Error("As inscrições deste campeonato estão encerradas.");
@@ -486,10 +498,22 @@ async function excluir(inscricaoId) {
     throw new Error("Não é permitido excluir inscrição após o chaveamento ter sido gerado.");
   }
 
-  await prisma.participante.delete({
-    where: {
-      id: Number(inscricaoId)
-    }
+  await prisma.$transaction(async (tx) => {
+    await tx.inscricaoIndividual.updateMany({
+      where: {
+        participanteId: Number(inscricaoId)
+      },
+      data: {
+        status: "PENDENTE",
+        participanteId: null
+      }
+    });
+
+    await tx.participante.delete({
+      where: {
+        id: Number(inscricaoId)
+      }
+    });
   });
 
   return { mensagem: "Inscrição excluída com sucesso." };

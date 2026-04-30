@@ -17,6 +17,7 @@ const botaoLogout = document.getElementById("botao-logout");
 const linkLogin = document.getElementById("link-login");
 const campoFormato = document.getElementById("formato");
 const campoQuantidadeMaxima = document.getElementById("quantidadeMaxima");
+const campoModoInscricao = document.getElementById("modoInscricao");
 
 let campeonatosComResumo = [];
 
@@ -63,14 +64,22 @@ function configurarQuantidadePorFormato() {
   }
 
   if (campoFormato.value === "GRUPOS_3X4_REPESCAGEM") {
-    campoQuantidadeMaxima.value = 12;
-    campoQuantidadeMaxima.readOnly = true;
-    campoQuantidadeMaxima.classList.add("campo-bloqueado");
+    campoQuantidadeMaxima.readOnly = false;
+    campoQuantidadeMaxima.classList.remove("campo-bloqueado");
+
+    if (!campoQuantidadeMaxima.value) {
+      campoQuantidadeMaxima.value = 12;
+    }
+
+    campoQuantidadeMaxima.min = 8;
+    campoQuantidadeMaxima.placeholder = "Use 8 ou 12";
     return;
   }
 
   campoQuantidadeMaxima.readOnly = false;
   campoQuantidadeMaxima.classList.remove("campo-bloqueado");
+  campoQuantidadeMaxima.min = 2;
+  campoQuantidadeMaxima.placeholder = "";
 }
 
 function formatarTexto(valor) {
@@ -108,12 +117,21 @@ function traduzirTipoParticipante(tipo) {
 function traduzirFormato(formato) {
   const mapa = {
     MATA_MATA: "Mata-mata",
-    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + repescagem + mata-mata",
+    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + mata-mata",
     DUPLA_ELIMINACAO: "Upper/Lower",
     TODOS_CONTRA_TODOS: "Todos contra todos"
   };
 
   return mapa[formato] || formato;
+}
+
+function traduzirModoInscricao(modoInscricao) {
+  const mapa = {
+    POR_EQUIPE: "Por equipe",
+    INDIVIDUAL: "Individual"
+  };
+
+  return mapa[modoInscricao] || "Por equipe";
 }
 
 function classeStatusCampeonato(status) {
@@ -162,6 +180,7 @@ function renderizarCampeonatos(campeonatos) {
           <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
           <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
           <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
+          <p><strong>Inscrição:</strong> ${traduzirModoInscricao(campeonato.modoInscricao)}</p>
           <p><strong>Quantidade máxima:</strong> ${
             campeonato.quantidadeMaxima ?? "Não definida"
           }</p>
@@ -201,8 +220,10 @@ async function carregarCampeonatos() {
       campeonatos.map(async (campeonato) => {
         try {
           const resumo = await buscarResumoCampeonato(campeonato.id);
+
           return {
             ...campeonato,
+            modoInscricao: resumo.campeonato?.modoInscricao || campeonato.modoInscricao,
             statusCampeonato: resumo.statusCampeonato
           };
         } catch {
@@ -261,6 +282,21 @@ formCampeonato.addEventListener("submit", async (event) => {
 
   const formData = new FormData(formCampeonato);
   const formatoSelecionado = formData.get("formato");
+  const modoInscricaoSelecionado = formData.get("modoInscricao") || "POR_EQUIPE";
+
+  let quantidadeMaxima = formData.get("quantidadeMaxima")
+    ? Number(formData.get("quantidadeMaxima"))
+    : null;
+
+  if (formatoSelecionado === "GRUPOS_3X4_REPESCAGEM") {
+    quantidadeMaxima = quantidadeMaxima || 12;
+
+    if (![8, 12].includes(quantidadeMaxima)) {
+      mensagem.textContent =
+        "Erro: no formato com fase de grupos, a quantidade máxima precisa ser 8 ou 12.";
+      return;
+    }
+  }
 
   const dadosCampeonato = {
     nome: formData.get("nome"),
@@ -269,12 +305,8 @@ formCampeonato.addEventListener("submit", async (event) => {
     tipoParticipante: formData.get("tipoParticipante"),
     categoria: formData.get("categoria"),
     formato: formatoSelecionado,
-    quantidadeMaxima:
-      formatoSelecionado === "GRUPOS_3X4_REPESCAGEM"
-        ? 12
-        : formData.get("quantidadeMaxima")
-          ? Number(formData.get("quantidadeMaxima"))
-          : null
+    modoInscricao: modoInscricaoSelecionado,
+    quantidadeMaxima
   };
 
   try {

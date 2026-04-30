@@ -8,6 +8,10 @@ import {
   excluirCampeonato,
   atualizarInscricao,
   atualizarCampeonato,
+  listarInscricoesIndividuaisCampeonato,
+  aprovarInscricaoIndividual,
+  reprovarInscricaoIndividual,
+  montarEquipeComInscricoesIndividuais,
   obterToken
 } from "./api.js";
 
@@ -16,6 +20,7 @@ const campeonatoId = params.get("id");
 
 const dadosCampeonato = document.getElementById("dados-campeonato");
 const listaParticipantes = document.getElementById("lista-participantes");
+const listaJogadoresIndividuais = document.getElementById("lista-jogadores-individuais");
 const listaJogos = document.getElementById("lista-jogos");
 const podio = document.getElementById("podio");
 const mensagemCampeonato = document.getElementById("mensagem-campeonato");
@@ -31,6 +36,7 @@ const chaveCampeonato = document.getElementById("chave-campeonato");
 let resumoAtual = null;
 let inscricaoEmEdicaoId = null;
 let campeonatoEmEdicao = false;
+let inscricoesIndividuaisAtual = [];
 
 function obterAdminLogado() {
   const dados = localStorage.getItem("adminLogado");
@@ -80,6 +86,15 @@ function formatarDataInput(data) {
   return new Date(data).toISOString().split("T")[0];
 }
 
+function formatarMoedaCentavos(valorCentavos) {
+  const valor = Number(valorCentavos || 0) / 100;
+
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
 function traduzirTipoParticipante(tipo) {
   const mapa = {
     DUPLA: "Dupla",
@@ -89,10 +104,50 @@ function traduzirTipoParticipante(tipo) {
   return mapa[tipo] || tipo;
 }
 
+function traduzirModoInscricao(modoInscricao) {
+  const mapa = {
+    POR_EQUIPE: "Por equipe",
+    INDIVIDUAL: "Individual"
+  };
+
+  return mapa[modoInscricao] || "Por equipe";
+}
+
+function traduzirSexoUsuario(sexo) {
+  const mapa = {
+    MASCULINO: "Masculino",
+    FEMININO: "Feminino",
+    OUTRO: "Outro",
+    PREFIRO_NAO_INFORMAR: "Prefiro não informar"
+  };
+
+  return mapa[sexo] || "Não informado";
+}
+
+function traduzirStatusInscricaoIndividual(status) {
+  const mapa = {
+    PENDENTE: "Aguardando formação de equipe",
+    USADA_EM_EQUIPE: "Já vinculado a uma equipe",
+    CANCELADA: "Cancelada"
+  };
+
+  return mapa[status] || status;
+}
+
+function traduzirStatusAnaliseInscricaoIndividual(statusAnalise) {
+  const mapa = {
+    AGUARDANDO_ANALISE: "Aguardando análise do admin",
+    APROVADA: "Aprovada",
+    REPROVADA: "Reprovada"
+  };
+
+  return mapa[statusAnalise] || statusAnalise || "Não informado";
+}
+
 function traduzirFormato(formato) {
   const mapa = {
     MATA_MATA: "Mata-mata",
-    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + repescagem + mata-mata",
+    GRUPOS_3X4_REPESCAGEM: "Fase de grupos + mata-mata",
     DUPLA_ELIMINACAO: "Upper/Lower",
     TODOS_CONTRA_TODOS: "Todos contra todos"
   };
@@ -104,6 +159,8 @@ function traduzirFase(fase) {
   const mapa = {
     FASE_GRUPOS: "Fase de grupos",
     REPESCAGEM: "Repescagem",
+    REPESCAGEM_1: "Repescagem 1",
+    REPESCAGEM_2: "Repescagem 2",
     SEMIFINAL_1: "Semifinal 1",
     SEMIFINAL_2: "Semifinal 2",
     FINAL: "Final",
@@ -155,9 +212,38 @@ function quantidadeMinimaParaChaveamento() {
   return 2;
 }
 
+function obterLimiteMembrosPorTipo(tipoParticipante) {
+  if (tipoParticipante === "DUPLA") return 2;
+  if (tipoParticipante === "TIME") return 4;
+  return 0;
+}
+
+function inscricaoIndividualAguardandoAnalise(inscricao) {
+  return (
+    inscricao.status !== "CANCELADA" &&
+    inscricao.statusAnalise === "AGUARDANDO_ANALISE"
+  );
+}
+
+function inscricaoIndividualAprovada(inscricao) {
+  return (
+    inscricao.status !== "CANCELADA" &&
+    inscricao.statusAnalise === "APROVADA"
+  );
+}
+
+function inscricaoIndividualDisponivel(inscricao) {
+  return (
+    inscricao.status === "PENDENTE" &&
+    inscricao.statusAnalise === "APROVADA" &&
+    !inscricao.participanteId &&
+    !inscricao.participante
+  );
+}
+
 function quantidadeValidaParaGerarChaveamento(resumo) {
   if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
-    return resumo.totais.participantes === 12;
+    return [8, 12].includes(resumo.totais.participantes);
   }
 
   return resumo.totais.participantes >= quantidadeMinimaParaChaveamento();
@@ -166,7 +252,7 @@ function quantidadeValidaParaGerarChaveamento(resumo) {
 function obterBaseFase(fase) {
   if (fase === "FINAL") return "FINAL";
   if (fase === "TERCEIRO_LUGAR") return "TERCEIRO_LUGAR";
-  if (fase === "REPESCAGEM") return "REPESCAGEM";
+  if (fase === "REPESCAGEM" || fase.startsWith("REPESCAGEM")) return "REPESCAGEM";
   if (fase === "FASE_GRUPOS") return "FASE_GRUPOS";
   if (fase.startsWith("PRIMEIRA_FASE")) return "PRIMEIRA_FASE";
   if (fase.startsWith("OITAVAS")) return "OITAVAS";
@@ -177,6 +263,24 @@ function obterBaseFase(fase) {
   if (match) return match[1];
 
   return fase;
+}
+
+function obterIndiceFase(fase) {
+  const baseFase = obterBaseFase(fase);
+
+  const ordem = [
+    "FASE_GRUPOS",
+    "REPESCAGEM",
+    "PRIMEIRA_FASE",
+    "OITAVAS",
+    "QUARTAS",
+    "SEMIFINAL",
+    "FINAL",
+    "TERCEIRO_LUGAR"
+  ];
+
+  const indice = ordem.indexOf(baseFase);
+  return indice === -1 ? 999 : indice;
 }
 
 function obterTituloGrupoFase(baseFase) {
@@ -205,12 +309,15 @@ function mensagemApoioChaveamento(resumo) {
     return "Feche as inscrições antes de gerar o chaveamento.";
   }
 
-  if (resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM" && total !== 12) {
-    return `Este formato precisa ter exatamente 12 participantes aprovados. Atualmente há ${total}.`;
+  if (
+    resumo.campeonato.formato === "GRUPOS_3X4_REPESCAGEM" &&
+    ![8, 12].includes(total)
+  ) {
+    return `Este formato precisa ter 8 ou 12 equipes aprovadas. Atualmente há ${total}.`;
   }
 
   if (total < 2) {
-    return "É necessário ter pelo menos 2 participantes para gerar o chaveamento.";
+    return "É necessário ter pelo menos 2 equipes formadas para gerar o chaveamento.";
   }
 
   return "Campeonato pronto para gerar chaveamento.";
@@ -237,7 +344,10 @@ function atualizarEstadoBotoes(resumo) {
 
 function renderizarFormularioEdicaoCampeonato(resumo) {
   const campeonato = resumo.campeonato;
-  const possuiInscritos = resumo.totais.participantes > 0;
+  const possuiInscritos =
+    resumo.totais.participantes > 0 ||
+    inscricoesIndividuaisAtual.some((inscricao) => inscricao.status !== "CANCELADA");
+
   const minimoQuantidade = Math.max(1, resumo.totais.participantes);
 
   return `
@@ -248,7 +358,7 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
         possuiInscritos
           ? `
             <p class="info-auxiliar">
-              Como já existem participantes inscritos, os campos Tipo, Categoria e Formato não podem mais ser alterados.
+              Como já existem equipes ou jogadores inscritos, os campos Tipo, Categoria, Formato e Forma de inscrição não podem mais ser alterados.
             </p>
           `
           : ""
@@ -288,10 +398,18 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
         </div>
 
         <div class="grupo-formulario">
+          <label>Forma de inscrição</label>
+          <select name="modoInscricao" ${possuiInscritos ? "disabled" : ""} required>
+            <option value="POR_EQUIPE" ${campeonato.modoInscricao === "POR_EQUIPE" ? "selected" : ""}>Por equipe</option>
+            <option value="INDIVIDUAL" ${campeonato.modoInscricao === "INDIVIDUAL" ? "selected" : ""}>Individual</option>
+          </select>
+        </div>
+
+        <div class="grupo-formulario">
           <label>Formato</label>
           <select name="formato" ${possuiInscritos ? "disabled" : ""} required>
             <option value="MATA_MATA" ${campeonato.formato === "MATA_MATA" ? "selected" : ""}>Mata-mata</option>
-            <option value="GRUPOS_3X4_REPESCAGEM" ${campeonato.formato === "GRUPOS_3X4_REPESCAGEM" ? "selected" : ""}>Fase de grupos + repescagem + mata-mata</option>
+            <option value="GRUPOS_3X4_REPESCAGEM" ${campeonato.formato === "GRUPOS_3X4_REPESCAGEM" ? "selected" : ""}>Fase de grupos + mata-mata</option>
             <option value="DUPLA_ELIMINACAO" ${campeonato.formato === "DUPLA_ELIMINACAO" ? "selected" : ""}>Upper/Lower</option>
             <option value="TODOS_CONTRA_TODOS" ${campeonato.formato === "TODOS_CONTRA_TODOS" ? "selected" : ""}>Todos contra todos</option>
           </select>
@@ -306,7 +424,7 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
             value="${campeonato.quantidadeMaxima ?? ""}"
           />
           <small class="texto-ajuda">
-            No formato com grupos + repescagem, a quantidade máxima será definida como 12.
+            No formato com grupos, use 8 ou 12 equipes.
           </small>
         </div>
 
@@ -330,6 +448,18 @@ function renderizarResumo(resumo) {
   const mensagemChaveamento = mensagemApoioChaveamento(resumo);
   const podeEditarCampeonato = resumo.jogos.length === 0;
 
+  const jogadoresIndividuaisAtivos = inscricoesIndividuaisAtual.filter(
+    (inscricao) => inscricao.status !== "CANCELADA"
+  ).length;
+
+  const jogadoresAguardandoAnalise = inscricoesIndividuaisAtual.filter(
+    inscricaoIndividualAguardandoAnalise
+  ).length;
+
+  const jogadoresAprovados = inscricoesIndividuaisAtual.filter(
+    inscricaoIndividualAprovada
+  ).length;
+
   dadosCampeonato.innerHTML = `
     <div class="bloco-informacoes">
       <p><strong>Nome:</strong> ${campeonato.nome}</p>
@@ -338,9 +468,13 @@ function renderizarResumo(resumo) {
       <p><strong>Tipo:</strong> ${traduzirTipoParticipante(campeonato.tipoParticipante)}</p>
       <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
       <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
+      <p><strong>Forma de inscrição:</strong> ${traduzirModoInscricao(campeonato.modoInscricao)}</p>
       <p><strong>Quantidade máxima:</strong> ${campeonato.quantidadeMaxima ?? "Não definida"}</p>
       <p><strong>Inscrições abertas:</strong> ${campeonato.inscricoesAbertas ? "Sim" : "Não"}</p>
-      <p><strong>Total de participantes:</strong> ${resumo.totais.participantes}</p>
+      <p><strong>Total de equipes:</strong> ${resumo.totais.participantes}</p>
+      <p><strong>Jogadores individuais ativos:</strong> ${jogadoresIndividuaisAtivos}</p>
+      <p><strong>Aguardando análise:</strong> ${jogadoresAguardandoAnalise}</p>
+      <p><strong>Jogadores aprovados:</strong> ${jogadoresAprovados}</p>
       <p><strong>Total de jogos:</strong> ${resumo.totais.jogos}</p>
       <p><strong>Jogos finalizados:</strong> ${resumo.totais.jogosFinalizados}</p>
       <span class="status-badge ${classeStatus}">${textoStatus}</span>
@@ -453,9 +587,9 @@ function renderizarFormularioEdicao(participante) {
   `;
 }
 
-function renderizarParticipantes(participantes) {
+function renderizarEquipes(participantes) {
   if (!participantes.length) {
-    listaParticipantes.innerHTML = "<p>Nenhum participante inscrito.</p>";
+    listaParticipantes.innerHTML = "<p>Nenhuma equipe inscrita ainda.</p>";
     return;
   }
 
@@ -473,6 +607,8 @@ function renderizarParticipantes(participantes) {
               <p><strong>Capitã(o):</strong> ${participante.responsavel}</p>
               <p><strong>Telefone:</strong> ${participante.contato || "Não informado"}</p>
               <p><strong>Status:</strong> ${participante.statusInscricao}</p>
+
+              <p><strong>Jogadores da equipe:</strong></p>
               <ul>
                 ${participante.jogadores
                   .map((jogador) => `<li>${jogador.nome} (${jogador.genero})</li>`)
@@ -487,20 +623,20 @@ function renderizarParticipantes(participantes) {
                         class="botao-pequeno"
                         data-editar-inscricao-id="${participante.id}"
                       >
-                        Editar inscrição
+                        Editar equipe inscrita
                       </button>
 
                       <button
                         class="botao-pequeno botao-excluir"
                         data-inscricao-id="${participante.id}"
                       >
-                        Excluir inscrição
+                        Excluir equipe inscrita
                       </button>
                     </div>
                   `
                   : `
                     <p class="info-auxiliar">
-                      A edição e exclusão de inscrição ficam indisponíveis após gerar o chaveamento.
+                      A edição e exclusão de equipes ficam indisponíveis após gerar o chaveamento.
                     </p>
                   `
               }
@@ -509,7 +645,7 @@ function renderizarParticipantes(participantes) {
                 estaEditando && podeEditarOuExcluir
                   ? `
                     <div class="area-edicao-inscricao">
-                      <h4>Editar inscrição</h4>
+                      <h4>Editar equipe inscrita</h4>
                       ${renderizarFormularioEdicao(participante)}
                     </div>
                   `
@@ -528,6 +664,440 @@ function renderizarParticipantes(participantes) {
     conectarEventosCancelarEdicaoInscricao();
     conectarEventosExclusaoInscricao();
   }
+}
+
+function renderizarFormularioMontarEquipe(inscricoesDisponiveis) {
+  if (!resumoAtual) return "";
+
+  const campeonato = resumoAtual.campeonato;
+  const podeMontarEquipe =
+    campeonato.modoInscricao === "INDIVIDUAL" &&
+    resumoAtual.jogos.length === 0;
+
+  if (!podeMontarEquipe) {
+    return "";
+  }
+
+  const quantidadeNecessaria = obterLimiteMembrosPorTipo(campeonato.tipoParticipante);
+
+  if (inscricoesDisponiveis.length < quantidadeNecessaria) {
+    return `
+      <div class="area-edicao-inscricao" style="margin-bottom: 16px;">
+        <h4>Montar equipe</h4>
+        <p class="info-auxiliar">
+          Para montar uma equipe, é necessário ter pelo menos ${quantidadeNecessaria} jogador(es) aprovados e disponíveis.
+        </p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="area-edicao-inscricao" style="margin-bottom: 16px;">
+      <h4>Montar equipe com jogadores aprovados</h4>
+
+      <p class="info-auxiliar">
+        Selecione exatamente ${quantidadeNecessaria} jogador(es) aprovados para formar uma equipe.
+      </p>
+
+      <form id="form-montar-equipe-individual" class="formulario-edicao-inscricao">
+        <div class="grupo-formulario">
+          <label for="nome-equipe-montada">Nome da equipe</label>
+          <input
+            type="text"
+            id="nome-equipe-montada"
+            name="nomeEquipe"
+            placeholder="Ex: Equipe 1"
+            required
+          />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="responsavel-equipe-montada">Capitã(o)</label>
+          <input
+            type="text"
+            id="responsavel-equipe-montada"
+            name="responsavel"
+            placeholder="Opcional: se vazio, será usado o nome do primeiro jogador"
+          />
+        </div>
+
+        <div class="grupo-formulario">
+          <label for="contato-equipe-montada">Contato</label>
+          <input
+            type="text"
+            id="contato-equipe-montada"
+            name="contato"
+            placeholder="Opcional"
+          />
+        </div>
+
+        <div class="acoes-card">
+          <button type="submit" class="botao-pequeno">
+            Criar equipe com selecionados
+          </button>
+        </div>
+
+        <p id="mensagem-montar-equipe" class="mensagem-edicao-inscricao"></p>
+      </form>
+    </div>
+  `;
+}
+
+function renderizarComprovante(inscricao) {
+  if (!inscricao.comprovantePagamento) {
+    return "<p><strong>Comprovante:</strong> Não enviado</p>";
+  }
+
+  return `
+    <div style="margin-top: 12px;">
+      <p><strong>Comprovante de pagamento:</strong></p>
+
+      <a
+        href="${inscricao.comprovantePagamento}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Abrir comprovante em nova aba"
+      >
+        <img
+          src="${inscricao.comprovantePagamento}"
+          alt="Comprovante de pagamento enviado"
+          style="
+            width: 220px;
+            max-width: 100%;
+            max-height: 260px;
+            object-fit: contain;
+            display: block;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 8px;
+            margin-top: 8px;
+            cursor: pointer;
+          "
+        />
+      </a>
+
+      <p class="info-auxiliar" style="margin-top: 6px;">
+        Clique na imagem para abrir em tamanho maior.
+      </p>
+    </div>
+  `;
+}
+
+function renderizarInscricoesAguardandoAnalise(inscricoesAguardando) {
+  if (!inscricoesAguardando.length) {
+    return `
+      <div class="area-edicao-inscricao" style="margin-bottom: 16px;">
+        <h4>Inscrições aguardando análise</h4>
+        <p class="info-auxiliar">Nenhuma inscrição aguardando análise no momento.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="area-edicao-inscricao" style="margin-bottom: 16px; border-color: #fde68a; background: #fffbeb;">
+      <h4>Inscrições aguardando análise</h4>
+
+      <p class="info-auxiliar">
+        Confira o comprovante de pagamento e o tamanho da camisa antes de aprovar.
+      </p>
+
+      <div class="lista-simples" style="margin-top: 12px;">
+        ${inscricoesAguardando
+          .map((inscricao) => {
+            const usuario = inscricao.usuario;
+
+            return `
+              <div class="item-lista">
+                <h3>${usuario?.nome || "Jogador"}</h3>
+
+                <p><strong>E-mail:</strong> ${usuario?.email || "Não informado"}</p>
+                <p><strong>Contato:</strong> ${usuario?.contato || "Não informado"}</p>
+                <p><strong>Sexo:</strong> ${traduzirSexoUsuario(usuario?.sexo)}</p>
+                <p><strong>Tamanho da camisa:</strong> ${inscricao.tamanhoCamisa || "Não informado"}</p>
+                <p><strong>Valor pago:</strong> ${formatarMoedaCentavos(inscricao.valorTotalCentavos)}</p>
+                <p><strong>Status da análise:</strong> ${traduzirStatusAnaliseInscricaoIndividual(inscricao.statusAnalise)}</p>
+                <p><strong>Enviado em:</strong> ${formatarData(inscricao.criadoEm)}</p>
+
+                ${renderizarComprovante(inscricao)}
+
+                <div class="acoes-card">
+                  <button
+                    type="button"
+                    class="botao-pequeno"
+                    data-aprovar-inscricao-individual-id="${inscricao.id}"
+                  >
+                    Aprovar inscrição
+                  </button>
+
+                  <button
+                    type="button"
+                    class="botao-pequeno botao-excluir"
+                    data-reprovar-inscricao-individual-id="${inscricao.id}"
+                  >
+                    Reprovar inscrição
+                  </button>
+                </div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarListaJogadoresAprovados(inscricoesAprovadas) {
+  if (!inscricoesAprovadas.length) {
+    return `
+      <div class="area-edicao-inscricao">
+        <h4>Jogadores aprovados</h4>
+        <p class="info-auxiliar">
+          Nenhum jogador aprovado ainda. Aprove inscrições após conferir os comprovantes.
+        </p>
+      </div>
+    `;
+  }
+
+  const inscricoesDisponiveis = inscricoesAprovadas.filter(inscricaoIndividualDisponivel);
+  const podeSelecionar =
+    resumoAtual?.campeonato?.modoInscricao === "INDIVIDUAL" &&
+    resumoAtual?.jogos?.length === 0;
+
+  return `
+    ${renderizarFormularioMontarEquipe(inscricoesDisponiveis)}
+
+    <div class="area-edicao-inscricao">
+      <h4>Jogadores aprovados</h4>
+
+      <div class="lista-simples" style="margin-top: 12px;">
+        ${inscricoesAprovadas
+          .map((inscricao) => {
+            const usuario = inscricao.usuario;
+            const participante = inscricao.participante;
+            const disponivel = inscricaoIndividualDisponivel(inscricao);
+
+            return `
+              <div class="item-lista">
+                <h3>${usuario?.nome || "Jogador"}</h3>
+
+                ${
+                  podeSelecionar && disponivel
+                    ? `
+                      <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <input
+                          type="checkbox"
+                          data-checkbox-inscricao-individual
+                          value="${inscricao.id}"
+                        />
+                        Selecionar para montar equipe
+                      </label>
+                    `
+                    : ""
+                }
+
+                <p><strong>E-mail:</strong> ${usuario?.email || "Não informado"}</p>
+                <p><strong>Contato:</strong> ${usuario?.contato || "Não informado"}</p>
+                <p><strong>Sexo:</strong> ${traduzirSexoUsuario(usuario?.sexo)}</p>
+                <p><strong>Tamanho da camisa:</strong> ${inscricao.tamanhoCamisa || "Não informado"}</p>
+                <p><strong>Status:</strong> ${traduzirStatusInscricaoIndividual(inscricao.status)}</p>
+                <p><strong>Status da análise:</strong> ${traduzirStatusAnaliseInscricaoIndividual(inscricao.statusAnalise)}</p>
+                <p><strong>Inscrito em:</strong> ${formatarData(inscricao.criadoEm)}</p>
+
+                ${
+                  participante
+                    ? `
+                      <p>
+                        <strong>Equipe formada:</strong> ${participante.nomeEquipe}
+                      </p>
+                    `
+                    : `
+                      <p class="info-auxiliar">
+                        Este jogador está aprovado e disponível para formação de equipe.
+                      </p>
+                    `
+                }
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarInscricoesReprovadas(inscricoesReprovadas) {
+  if (!inscricoesReprovadas.length) {
+    return "";
+  }
+
+  return `
+    <div class="area-edicao-inscricao" style="margin-top: 16px; border-color: #fecaca; background: #fef2f2;">
+      <h4>Inscrições reprovadas/canceladas</h4>
+
+      <div class="lista-simples" style="margin-top: 12px;">
+        ${inscricoesReprovadas
+          .map((inscricao) => {
+            const usuario = inscricao.usuario;
+
+            return `
+              <div class="item-lista">
+                <h3>${usuario?.nome || "Jogador"}</h3>
+                <p><strong>E-mail:</strong> ${usuario?.email || "Não informado"}</p>
+                <p><strong>Contato:</strong> ${usuario?.contato || "Não informado"}</p>
+                <p><strong>Tamanho da camisa:</strong> ${inscricao.tamanhoCamisa || "Não informado"}</p>
+                <p><strong>Status:</strong> ${traduzirStatusInscricaoIndividual(inscricao.status)}</p>
+                <p><strong>Status da análise:</strong> ${traduzirStatusAnaliseInscricaoIndividual(inscricao.statusAnalise)}</p>
+                <p><strong>Observação:</strong> ${inscricao.observacaoAdmin || "Não informada"}</p>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderizarJogadoresIndividuais(inscricoes) {
+  if (!listaJogadoresIndividuais) {
+    return;
+  }
+
+  if (!inscricoes || !inscricoes.length) {
+    listaJogadoresIndividuais.innerHTML = `
+      <p>Nenhum jogador inscrito individualmente ainda.</p>
+    `;
+    return;
+  }
+
+  const inscricoesAguardando = inscricoes.filter(inscricaoIndividualAguardandoAnalise);
+  const inscricoesAprovadas = inscricoes.filter(inscricaoIndividualAprovada);
+  const inscricoesReprovadas = inscricoes.filter(
+    (inscricao) =>
+      inscricao.status === "CANCELADA" ||
+      inscricao.statusAnalise === "REPROVADA"
+  );
+
+  listaJogadoresIndividuais.innerHTML = `
+    ${renderizarInscricoesAguardandoAnalise(inscricoesAguardando)}
+    ${renderizarListaJogadoresAprovados(inscricoesAprovadas)}
+    ${renderizarInscricoesReprovadas(inscricoesReprovadas)}
+  `;
+
+  conectarEventosAnaliseInscricaoIndividual();
+  conectarEventosMontagemEquipeIndividual();
+}
+
+function conectarEventosAnaliseInscricaoIndividual() {
+  const botoesAprovar = document.querySelectorAll("[data-aprovar-inscricao-individual-id]");
+
+  botoesAprovar.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const inscricaoId = Number(botao.dataset.aprovarInscricaoIndividualId);
+
+      const confirmar = window.confirm(
+        "Confirmar aprovação desta inscrição? O jogador ficará disponível para formação de equipe."
+      );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        mensagemCampeonato.textContent = "Aprovando inscrição individual...";
+        await aprovarInscricaoIndividual(inscricaoId);
+        await carregarResumo(false);
+        mensagemCampeonato.textContent = "Inscrição individual aprovada com sucesso.";
+      } catch (error) {
+        mensagemCampeonato.textContent = `Erro ao aprovar inscrição: ${error.message}`;
+      }
+    });
+  });
+
+  const botoesReprovar = document.querySelectorAll("[data-reprovar-inscricao-individual-id]");
+
+  botoesReprovar.forEach((botao) => {
+    botao.addEventListener("click", async () => {
+      const inscricaoId = Number(botao.dataset.reprovarInscricaoIndividualId);
+
+      const observacaoAdmin = window.prompt(
+        "Informe uma observação para a reprovação, se desejar:"
+      );
+
+      const confirmar = window.confirm(
+        "Confirmar reprovação desta inscrição? Ela não ficará disponível para formação de equipe."
+      );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        mensagemCampeonato.textContent = "Reprovando inscrição individual...";
+        await reprovarInscricaoIndividual(inscricaoId, observacaoAdmin || "");
+        await carregarResumo(false);
+        mensagemCampeonato.textContent = "Inscrição individual reprovada.";
+      } catch (error) {
+        mensagemCampeonato.textContent = `Erro ao reprovar inscrição: ${error.message}`;
+      }
+    });
+  });
+}
+
+function conectarEventosMontagemEquipeIndividual() {
+  const form = document.getElementById("form-montar-equipe-individual");
+
+  if (!form || !resumoAtual) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const mensagemMontarEquipe = document.getElementById("mensagem-montar-equipe");
+    const quantidadeNecessaria = obterLimiteMembrosPorTipo(
+      resumoAtual.campeonato.tipoParticipante
+    );
+
+    const checkboxesSelecionados = Array.from(
+      document.querySelectorAll("[data-checkbox-inscricao-individual]:checked")
+    );
+
+    const inscricaoIds = checkboxesSelecionados.map((checkbox) =>
+      Number(checkbox.value)
+    );
+
+    if (inscricaoIds.length !== quantidadeNecessaria) {
+      mensagemMontarEquipe.textContent =
+        `Selecione exatamente ${quantidadeNecessaria} jogador(es) para montar a equipe.`;
+      return;
+    }
+
+    const nomeEquipe = form.querySelector('[name="nomeEquipe"]').value.trim();
+    const responsavel = form.querySelector('[name="responsavel"]').value.trim();
+    const contato = form.querySelector('[name="contato"]').value.trim();
+
+    if (!nomeEquipe) {
+      mensagemMontarEquipe.textContent = "Informe o nome da equipe.";
+      return;
+    }
+
+    try {
+      mensagemMontarEquipe.textContent = "Criando equipe...";
+
+      await montarEquipeComInscricoesIndividuais(campeonatoId, {
+        nomeEquipe,
+        responsavel: responsavel || null,
+        contato: contato || null,
+        inscricaoIds
+      });
+
+      await carregarResumo(false);
+      mensagemCampeonato.textContent = "Equipe montada com sucesso.";
+    } catch (error) {
+      mensagemMontarEquipe.textContent = `Erro ao montar equipe: ${error.message}`;
+    }
+  });
 }
 
 function montarSetsExistentes(jogo) {
@@ -656,24 +1226,38 @@ function conectarFormularioEdicaoCampeonato() {
     try {
       mensagemEdicao.textContent = "Salvando campeonato...";
 
-      const formatoSelecionado =
-        resumoAtual.totais.participantes > 0
-          ? resumoAtual.campeonato.formato
-          : form.querySelector('[name="formato"]').value;
+      const possuiInscritos =
+        resumoAtual.totais.participantes > 0 ||
+        inscricoesIndividuaisAtual.some((inscricao) => inscricao.status !== "CANCELADA");
 
-      const quantidadeMaximaValor =
-        formatoSelecionado === "GRUPOS_3X4_REPESCAGEM"
-          ? 12
-          : form.querySelector('[name="quantidadeMaxima"]').value
-            ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
-            : null;
+      const formatoSelecionado = possuiInscritos
+        ? resumoAtual.campeonato.formato
+        : form.querySelector('[name="formato"]').value;
+
+      const modoInscricaoSelecionado = possuiInscritos
+        ? resumoAtual.campeonato.modoInscricao
+        : form.querySelector('[name="modoInscricao"]').value;
+
+      let quantidadeMaximaValor = form.querySelector('[name="quantidadeMaxima"]').value
+        ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
+        : null;
+
+      if (formatoSelecionado === "GRUPOS_3X4_REPESCAGEM") {
+        quantidadeMaximaValor = quantidadeMaximaValor || 12;
+
+        if (![8, 12].includes(quantidadeMaximaValor)) {
+          mensagemEdicao.textContent =
+            "Erro: no formato com grupos, a quantidade máxima precisa ser 8 ou 12.";
+          return;
+        }
+      }
 
       if (
         quantidadeMaximaValor !== null &&
         quantidadeMaximaValor < resumoAtual.totais.participantes
       ) {
         mensagemEdicao.textContent =
-          `Erro: a quantidade máxima não pode ser menor que o total atual de inscritos (${resumoAtual.totais.participantes}).`;
+          `Erro: a quantidade máxima não pode ser menor que o total atual de equipes (${resumoAtual.totais.participantes}).`;
         return;
       }
 
@@ -681,13 +1265,14 @@ function conectarFormularioEdicaoCampeonato() {
         nome: form.querySelector('[name="nome"]').value.trim(),
         data: form.querySelector('[name="data"]').value || null,
         local: form.querySelector('[name="local"]').value.trim() || null,
-        tipoParticipante: resumoAtual.totais.participantes > 0
+        tipoParticipante: possuiInscritos
           ? resumoAtual.campeonato.tipoParticipante
           : form.querySelector('[name="tipoParticipante"]').value,
-        categoria: resumoAtual.totais.participantes > 0
+        categoria: possuiInscritos
           ? resumoAtual.campeonato.categoria
           : form.querySelector('[name="categoria"]').value,
         formato: formatoSelecionado,
+        modoInscricao: modoInscricaoSelecionado,
         quantidadeMaxima: quantidadeMaximaValor
       });
 
@@ -718,7 +1303,7 @@ function conectarEventosEdicaoInscricao() {
   botoes.forEach((botao) => {
     botao.addEventListener("click", () => {
       inscricaoEmEdicaoId = Number(botao.dataset.editarInscricaoId);
-      renderizarParticipantes(resumoAtual.participantes);
+      renderizarEquipes(resumoAtual.participantes);
       mensagemCampeonato.textContent = "";
     });
   });
@@ -739,7 +1324,7 @@ function conectarEventosFormularioEdicaoInscricao() {
       );
 
       if (!participante) {
-        mensagemEdicao.textContent = "Inscrição não encontrada para edição.";
+        mensagemEdicao.textContent = "Equipe não encontrada para edição.";
         return;
       }
 
@@ -749,7 +1334,7 @@ function conectarEventosFormularioEdicaoInscricao() {
       }));
 
       try {
-        mensagemEdicao.textContent = "Atualizando inscrição...";
+        mensagemEdicao.textContent = "Atualizando equipe...";
 
         await atualizarInscricao(inscricaoId, {
           nomeEquipe: form.querySelector('[name="nomeEquipe"]').value.trim(),
@@ -760,7 +1345,7 @@ function conectarEventosFormularioEdicaoInscricao() {
 
         inscricaoEmEdicaoId = null;
         await carregarResumo(false);
-        mensagemCampeonato.textContent = "Inscrição atualizada com sucesso.";
+        mensagemCampeonato.textContent = "Equipe atualizada com sucesso.";
       } catch (error) {
         mensagemEdicao.textContent = `Erro: ${error.message}`;
       }
@@ -774,7 +1359,7 @@ function conectarEventosCancelarEdicaoInscricao() {
   botoes.forEach((botao) => {
     botao.addEventListener("click", () => {
       inscricaoEmEdicaoId = null;
-      renderizarParticipantes(resumoAtual.participantes);
+      renderizarEquipes(resumoAtual.participantes);
       mensagemCampeonato.textContent = "Edição cancelada.";
     });
   });
@@ -786,19 +1371,19 @@ function conectarEventosExclusaoInscricao() {
   botoes.forEach((botao) => {
     botao.addEventListener("click", async () => {
       const inscricaoId = botao.dataset.inscricaoId;
-      const confirmar = window.confirm("Tem certeza que deseja excluir esta inscrição?");
+      const confirmar = window.confirm("Tem certeza que deseja excluir esta equipe inscrita?");
 
       if (!confirmar) {
         return;
       }
 
       try {
-        mensagemCampeonato.textContent = "Excluindo inscrição...";
+        mensagemCampeonato.textContent = "Excluindo equipe...";
         await excluirInscricao(inscricaoId);
         await carregarResumo(false);
-        mensagemCampeonato.textContent = "Inscrição excluída com sucesso.";
+        mensagemCampeonato.textContent = "Equipe excluída com sucesso.";
       } catch (error) {
-        mensagemCampeonato.textContent = `Erro ao excluir inscrição: ${error.message}`;
+        mensagemCampeonato.textContent = `Erro ao excluir equipe: ${error.message}`;
       }
     });
   });
@@ -817,30 +1402,20 @@ function agruparJogosPorColunaMataMata(jogos) {
     grupos.get(baseFase).push(jogo);
   });
 
-  const ordem = [
-    "FASE_GRUPOS",
-    "REPESCAGEM",
-    "PRIMEIRA_FASE",
-    "OITAVAS",
-    "QUARTAS",
-    "SEMIFINAL",
-    "FINAL",
-    "TERCEIRO_LUGAR"
-  ];
-
   return Array.from(grupos.entries()).sort((a, b) => {
-    const indiceA = ordem.indexOf(a[0]);
-    const indiceB = ordem.indexOf(b[0]);
-
-    const valorA = indiceA === -1 ? 999 : indiceA;
-    const valorB = indiceB === -1 ? 999 : indiceB;
-
-    return valorA - valorB;
+    return obterIndiceFase(a[0]) - obterIndiceFase(b[0]);
   });
 }
 
 function ordenarJogos(lista) {
   return [...lista].sort((a, b) => {
+    const indiceFaseA = obterIndiceFase(a.fase);
+    const indiceFaseB = obterIndiceFase(b.fase);
+
+    if (indiceFaseA !== indiceFaseB) {
+      return indiceFaseA - indiceFaseB;
+    }
+
     const grupoA = a.grupo || "";
     const grupoB = b.grupo || "";
 
@@ -1082,7 +1657,9 @@ function renderizarColunaChave(titulo, conteudo, temSeta = true) {
 
 function renderizarChaveGruposRepescagem(jogos) {
   const jogosGrupo = ordenarJogos(jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS"));
-  const jogosRepescagem = ordenarJogos(jogos.filter((jogo) => jogo.fase === "REPESCAGEM"));
+  const jogosRepescagem = ordenarJogos(
+    jogos.filter((jogo) => obterBaseFase(jogo.fase) === "REPESCAGEM")
+  );
   const jogosQuartas = ordenarJogos(
     jogos.filter((jogo) => obterBaseFase(jogo.fase) === "QUARTAS")
   );
@@ -1092,24 +1669,34 @@ function renderizarChaveGruposRepescagem(jogos) {
   const jogosFinal = ordenarJogos(jogos.filter((jogo) => jogo.fase === "FINAL"));
   const jogosTerceiro = ordenarJogos(jogos.filter((jogo) => jogo.fase === "TERCEIRO_LUGAR"));
 
-  const jogosGrupoA = jogosGrupo.filter((jogo) => jogo.grupo === "A");
-  const jogosGrupoB = jogosGrupo.filter((jogo) => jogo.grupo === "B");
-  const jogosGrupoC = jogosGrupo.filter((jogo) => jogo.grupo === "C");
+  const gruposExistentes = [
+    ...new Set(jogosGrupo.map((jogo) => jogo.grupo).filter(Boolean))
+  ].sort();
+
+  const htmlGrupos = gruposExistentes
+    .map((grupo) => {
+      const jogosDoGrupo = jogosGrupo.filter((jogo) => jogo.grupo === grupo);
+      return renderizarResumoGrupoChave(grupo, jogosDoGrupo);
+    })
+    .join("");
 
   const colunas = [
     {
       titulo: "Fase de grupos",
-      html:
-        renderizarResumoGrupoChave("A", jogosGrupoA) +
-        renderizarResumoGrupoChave("B", jogosGrupoB) +
-        renderizarResumoGrupoChave("C", jogosGrupoC)
-    },
-    {
+      html: htmlGrupos
+    }
+  ];
+
+  if (gruposExistentes.length === 3 || jogosRepescagem.length > 0) {
+    colunas.push({
       titulo: "Repescagem",
       html: jogosRepescagem.length
         ? jogosRepescagem.map((jogo) => renderizarCardJogoChaveCompacto(jogo)).join("")
         : renderizarPlaceholderChave("Aguardando conclusão da fase de grupos.")
-    },
+    });
+  }
+
+  colunas.push(
     {
       titulo: "Quartas de final",
       html: jogosQuartas.length
@@ -1134,7 +1721,7 @@ function renderizarChaveGruposRepescagem(jogos) {
               .join("")
           : "")
     }
-  ];
+  );
 
   chaveCampeonato.innerHTML = `
     <div class="chave-horizontal-wrapper">
@@ -1402,10 +1989,18 @@ async function carregarResumo(limparMensagemPrincipal = true) {
     }
 
     const resumo = await buscarResumoCampeonato(campeonatoId);
+
+    try {
+      inscricoesIndividuaisAtual = await listarInscricoesIndividuaisCampeonato(campeonatoId);
+    } catch {
+      inscricoesIndividuaisAtual = [];
+    }
+
     resumoAtual = resumo;
 
     renderizarResumo(resumo);
-    renderizarParticipantes(resumo.participantes);
+    renderizarEquipes(resumo.participantes);
+    renderizarJogadoresIndividuais(inscricoesIndividuaisAtual);
     renderizarChave(resumo);
     renderizarJogos(resumo.jogos);
     renderizarPodio(resumo.podio);

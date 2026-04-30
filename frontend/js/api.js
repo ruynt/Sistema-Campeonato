@@ -141,6 +141,52 @@ async function criarInscricao(campeonatoId, dadosInscricao) {
   });
 }
 
+async function criarInscricaoIndividual(campeonatoId, dadosInscricaoIndividual) {
+  return fazerRequisicao(`/campeonatos/${campeonatoId}/inscricoes-individuais`, {
+    method: "POST",
+    headers: obterCabecalhoParticipante(),
+    body: JSON.stringify(dadosInscricaoIndividual),
+    usarTokenAdmin: false
+  });
+}
+
+async function listarInscricoesIndividuaisCampeonato(campeonatoId) {
+  return fazerRequisicao(`/campeonatos/${campeonatoId}/inscricoes-individuais`, {
+    method: "GET"
+  });
+}
+
+async function aprovarInscricaoIndividual(inscricaoId) {
+  return fazerRequisicao(
+    `/campeonatos/inscricoes-individuais/${inscricaoId}/aprovar`,
+    {
+      method: "PATCH"
+    }
+  );
+}
+
+async function reprovarInscricaoIndividual(inscricaoId, observacaoAdmin = "") {
+  return fazerRequisicao(
+    `/campeonatos/inscricoes-individuais/${inscricaoId}/reprovar`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        observacaoAdmin
+      })
+    }
+  );
+}
+
+async function montarEquipeComInscricoesIndividuais(campeonatoId, dadosEquipe) {
+  return fazerRequisicao(
+    `/campeonatos/${campeonatoId}/inscricoes-individuais/montar-equipe`,
+    {
+      method: "POST",
+      body: JSON.stringify(dadosEquipe)
+    }
+  );
+}
+
 async function registrarPlacar(jogoId, sets) {
   return fazerRequisicao(`/jogos/${jogoId}/placar`, {
     method: "PATCH",
@@ -301,6 +347,14 @@ async function aceitarConviteEquipe(token) {
   });
 }
 
+async function buscarMinhaInscricaoIndividual(campeonatoId) {
+  return fazerRequisicao(`/campeonatos/${campeonatoId}/minha-inscricao-individual`, {
+    method: "GET",
+    headers: obterCabecalhoParticipante(),
+    usarTokenAdmin: false
+  });
+}
+
 export {
   loginAdmin,
   cadastrarParticipante,
@@ -317,6 +371,12 @@ export {
   gerarChaveamento,
   buscarCampeonatoPorId,
   criarInscricao,
+  criarInscricaoIndividual,
+  buscarMinhaInscricaoIndividual,
+  listarInscricoesIndividuaisCampeonato,
+  aprovarInscricaoIndividual,
+  reprovarInscricaoIndividual,
+  montarEquipeComInscricoesIndividuais,
   registrarPlacar,
   excluirInscricao,
   excluirCampeonato,

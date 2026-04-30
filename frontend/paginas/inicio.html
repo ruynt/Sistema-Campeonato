@@ -60,10 +60,21 @@
         </div>
 
         <div class="grupo-formulario">
+          <label for="modoInscricao">Forma de inscrição</label>
+          <select id="modoInscricao" name="modoInscricao" required>
+            <option value="POR_EQUIPE">Por equipe</option>
+            <option value="INDIVIDUAL">Individual</option>
+          </select>
+          <small class="texto-ajuda">
+            Por equipe: o participante inscreve uma equipe pronta. Individual: cada pessoa se inscreve sozinha e o administrador forma as equipes depois.
+          </small>
+        </div>
+
+        <div class="grupo-formulario">
           <label for="formato">Formato</label>
           <select id="formato" name="formato" required>
             <option value="MATA_MATA">Mata-mata</option>
-            <option value="GRUPOS_3X4_REPESCAGEM">Fase de grupos + repescagem + mata-mata</option>
+            <option value="GRUPOS_3X4_REPESCAGEM">Fase de grupos + mata-mata</option>
             <option value="DUPLA_ELIMINACAO">Upper/Lower (em breve)</option>
             <option value="TODOS_CONTRA_TODOS">Todos contra todos (em breve)</option>
           </select>
@@ -76,10 +87,10 @@
             id="quantidadeMaxima"
             name="quantidadeMaxima"
             min="2"
-            placeholder="Ex: 12"
+            placeholder="Ex: 8 ou 12"
           />
           <small class="texto-ajuda">
-            No formato com grupos + repescagem, a quantidade será definida como 12.
+            No formato com fase de grupos, use 8 ou 12 participantes/equipes.
           </small>
         </div>
 

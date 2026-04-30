@@ -1,6 +1,8 @@
 import { prisma } from "../banco/prisma.js";
 import { embaralharLista } from "../utilitarios/sorteio.js";
 
+const FORMATOS_EM_BREVE = ["DUPLA_ELIMINACAO", "TODOS_CONTRA_TODOS"];
+
 function proximaPotenciaDeDois(numero) {
   let potencia = 1;
 
@@ -36,7 +38,7 @@ function obterBaseDaFase(fase) {
     return fase;
   }
 
-  if (fase === "REPESCAGEM") {
+  if (fase === "REPESCAGEM" || fase.startsWith("REPESCAGEM")) {
     return "REPESCAGEM";
   }
 
@@ -61,11 +63,81 @@ function obterBaseDaFase(fase) {
   }
 
   const faseSemIndice = fase.match(/^(.*)_\d+$/);
+
   if (faseSemIndice) {
     return faseSemIndice[1];
   }
 
   return fase;
+}
+
+function formatoEstaEmBreve(formato) {
+  return FORMATOS_EM_BREVE.includes(formato);
+}
+
+function validarFormatoDisponivel(formato) {
+  if (formatoEstaEmBreve(formato)) {
+    throw new Error("Este formato de campeonato ainda está em breve.");
+  }
+}
+
+function faseFoiFinalizada(jogos) {
+  return (
+    jogos.length > 0 &&
+    jogos.every((jogo) => jogo.status === "FINALIZADO" && jogo.vencedorId)
+  );
+}
+
+function obterPerdedorDoJogo(jogo) {
+  if (!jogo || !jogo.vencedorId) {
+    return null;
+  }
+
+  if (jogo.equipeAId === jogo.vencedorId) {
+    return jogo.equipeB;
+  }
+
+  return jogo.equipeA;
+}
+
+function compararClassificacao(a, b) {
+  if (b.vitorias !== a.vitorias) {
+    return b.vitorias - a.vitorias;
+  }
+
+  if (b.saldoSets !== a.saldoSets) {
+    return b.saldoSets - a.saldoSets;
+  }
+
+  if (b.saldoPontos !== a.saldoPontos) {
+    return b.saldoPontos - a.saldoPontos;
+  }
+
+  return Math.random() - 0.5;
+}
+
+function obterClassificado(classificacao, grupo, posicao) {
+  return classificacao[grupo]?.[posicao]?.participante || null;
+}
+
+function obterItemClassificacao(classificacao, grupo, posicao) {
+  return classificacao[grupo]?.[posicao] || null;
+}
+
+function garantirParticipantesClassificados(participantes) {
+  const todosExistem = participantes.every(Boolean);
+
+  if (!todosExistem) {
+    throw new Error(
+      "Não foi possível montar a próxima fase porque a classificação dos grupos está incompleta."
+    );
+  }
+}
+
+function garantirJogoFinalizado(jogo, nomeFase) {
+  if (!jogo || jogo.status !== "FINALIZADO" || !jogo.vencedorId) {
+    throw new Error(`O jogo ${nomeFase} ainda não foi finalizado corretamente.`);
+  }
 }
 
 async function criarJogosDaFase(campeonatoId, baseFase, equipes) {
@@ -113,6 +185,10 @@ async function criarJogosDaFase(campeonatoId, baseFase, equipes) {
 }
 
 function montarJogosGrupo(campeonatoId, grupo, equipes) {
+  if (equipes.length !== 4) {
+    throw new Error("Cada grupo precisa ter exatamente 4 equipes.");
+  }
+
   return [
     {
       fase: "FASE_GRUPOS",
@@ -172,23 +248,25 @@ function montarJogosGrupo(campeonatoId, grupo, equipes) {
 }
 
 async function gerarFaseDeGruposComRepescagem(campeonatoId, participantes) {
-  if (participantes.length !== 12) {
+  if (![8, 12].includes(participantes.length)) {
     throw new Error(
-      "O formato Fase de grupos + repescagem + mata-mata precisa ter exatamente 12 participantes aprovados."
+      "O formato Fase de grupos + repescagem + mata-mata precisa ter 8 ou 12 participantes aprovados."
     );
   }
 
   const participantesEmbaralhados = embaralharLista(participantes);
+  const letrasGrupos = ["A", "B", "C"];
+  const quantidadeGrupos = participantes.length / 4;
 
-  const grupoA = participantesEmbaralhados.slice(0, 4);
-  const grupoB = participantesEmbaralhados.slice(4, 8);
-  const grupoC = participantesEmbaralhados.slice(8, 12);
+  const jogos = [];
 
-  const jogos = [
-    ...montarJogosGrupo(campeonatoId, "A", grupoA),
-    ...montarJogosGrupo(campeonatoId, "B", grupoB),
-    ...montarJogosGrupo(campeonatoId, "C", grupoC)
-  ];
+  for (let i = 0; i < quantidadeGrupos; i++) {
+    const grupo = letrasGrupos[i];
+    const inicio = i * 4;
+    const equipesDoGrupo = participantesEmbaralhados.slice(inicio, inicio + 4);
+
+    jogos.push(...montarJogosGrupo(campeonatoId, grupo, equipesDoGrupo));
+  }
 
   await prisma.jogo.createMany({
     data: jogos
@@ -225,6 +303,10 @@ function criarTabelaGrupo(jogosDoGrupo) {
 
     const equipeA = tabela.get(jogo.equipeAId);
     const equipeB = tabela.get(jogo.equipeBId);
+
+    if (!equipeA || !equipeB) {
+      return;
+    }
 
     equipeA.jogos += 1;
     equipeB.jogos += 1;
@@ -279,10 +361,12 @@ function criarTabelaGrupo(jogosDoGrupo) {
 
     const confrontoDireto = jogosDoGrupo.find((jogo) => {
       const envolveA =
-        jogo.equipeAId === a.participante.id || jogo.equipeBId === a.participante.id;
+        jogo.equipeAId === a.participante.id ||
+        jogo.equipeBId === a.participante.id;
 
       const envolveB =
-        jogo.equipeAId === b.participante.id || jogo.equipeBId === b.participante.id;
+        jogo.equipeAId === b.participante.id ||
+        jogo.equipeBId === b.participante.id;
 
       return envolveA && envolveB && jogo.vencedorId;
     });
@@ -306,36 +390,61 @@ function criarTabelaGrupo(jogosDoGrupo) {
 function montarClassificacaoDosGrupos(jogos) {
   const jogosFaseGrupos = jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS");
 
-  const grupos = {
-    A: jogosFaseGrupos.filter((jogo) => jogo.grupo === "A"),
-    B: jogosFaseGrupos.filter((jogo) => jogo.grupo === "B"),
-    C: jogosFaseGrupos.filter((jogo) => jogo.grupo === "C")
-  };
+  const letrasGrupos = [
+    ...new Set(jogosFaseGrupos.map((jogo) => jogo.grupo).filter(Boolean))
+  ].sort();
 
-  return {
-    A: criarTabelaGrupo(grupos.A),
-    B: criarTabelaGrupo(grupos.B),
-    C: criarTabelaGrupo(grupos.C)
-  };
+  const classificacao = {};
+
+  letrasGrupos.forEach((grupo) => {
+    const jogosDoGrupo = jogosFaseGrupos.filter((jogo) => jogo.grupo === grupo);
+    classificacao[grupo] = criarTabelaGrupo(jogosDoGrupo);
+  });
+
+  return classificacao;
 }
 
-function faseFoiFinalizada(jogos) {
-  return jogos.every((jogo) => jogo.status === "FINALIZADO" && jogo.vencedorId);
-}
+async function criarFinalETerceiroLugar(campeonatoId, semifinal1, semifinal2, jogoFinal, jogoTerceiroLugar) {
+  garantirJogoFinalizado(semifinal1, "SEMIFINAL_1");
+  garantirJogoFinalizado(semifinal2, "SEMIFINAL_2");
 
-function obterPerdedorDoJogo(jogo) {
-  if (!jogo || !jogo.vencedorId) {
-    return null;
+  const perdedorSemifinal1 = obterPerdedorDoJogo(semifinal1);
+  const perdedorSemifinal2 = obterPerdedorDoJogo(semifinal2);
+
+  if (!perdedorSemifinal1 || !perdedorSemifinal2) {
+    throw new Error("Não foi possível identificar os perdedores das semifinais.");
   }
 
-  if (jogo.equipeAId === jogo.vencedorId) {
-    return jogo.equipeB;
+  const jogosParaCriar = [];
+
+  if (!jogoFinal) {
+    jogosParaCriar.push({
+      fase: "FINAL",
+      campeonatoId: Number(campeonatoId),
+      equipeAId: semifinal1.vencedorId,
+      equipeBId: semifinal2.vencedorId,
+      ordem: 1
+    });
   }
 
-  return jogo.equipeA;
+  if (!jogoTerceiroLugar) {
+    jogosParaCriar.push({
+      fase: "TERCEIRO_LUGAR",
+      campeonatoId: Number(campeonatoId),
+      equipeAId: perdedorSemifinal1.id,
+      equipeBId: perdedorSemifinal2.id,
+      ordem: 1
+    });
+  }
+
+  if (jogosParaCriar.length > 0) {
+    await prisma.jogo.createMany({
+      data: jogosParaCriar
+    });
+  }
 }
 
-async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
+async function gerarProximaFaseGruposRepescagem12(campeonatoId, campeonato) {
   const jogos = campeonato.jogos;
 
   const jogosFaseGrupos = jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS");
@@ -355,17 +464,29 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
 
   const classificacao = montarClassificacaoDosGrupos(jogos);
 
-  const primeiroA = classificacao.A[0]?.participante;
-  const segundoA = classificacao.A[1]?.participante;
-  const terceiroA = classificacao.A[2];
+  const primeiroA = obterClassificado(classificacao, "A", 0);
+  const segundoA = obterClassificado(classificacao, "A", 1);
+  const terceiroA = obterItemClassificacao(classificacao, "A", 2);
 
-  const primeiroB = classificacao.B[0]?.participante;
-  const segundoB = classificacao.B[1]?.participante;
-  const terceiroB = classificacao.B[2];
+  const primeiroB = obterClassificado(classificacao, "B", 0);
+  const segundoB = obterClassificado(classificacao, "B", 1);
+  const terceiroB = obterItemClassificacao(classificacao, "B", 2);
 
-  const primeiroC = classificacao.C[0]?.participante;
-  const segundoC = classificacao.C[1]?.participante;
-  const terceiroC = classificacao.C[2];
+  const primeiroC = obterClassificado(classificacao, "C", 0);
+  const segundoC = obterClassificado(classificacao, "C", 1);
+  const terceiroC = obterItemClassificacao(classificacao, "C", 2);
+
+  garantirParticipantesClassificados([
+    primeiroA,
+    segundoA,
+    terceiroA?.participante,
+    primeiroB,
+    segundoB,
+    terceiroB?.participante,
+    primeiroC,
+    segundoC,
+    terceiroC?.participante
+  ]);
 
   const terceiros = [
     { grupo: "A", ...terceiroA },
@@ -373,24 +494,12 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
     { grupo: "C", ...terceiroC }
   ];
 
-  terceiros.sort((a, b) => {
-    if (b.vitorias !== a.vitorias) {
-      return b.vitorias - a.vitorias;
-    }
-
-    if (b.saldoSets !== a.saldoSets) {
-      return b.saldoSets - a.saldoSets;
-    }
-
-    if (b.saldoPontos !== a.saldoPontos) {
-      return b.saldoPontos - a.saldoPontos;
-    }
-
-    return Math.random() - 0.5;
-  });
+  terceiros.sort(compararClassificacao);
 
   const melhorTerceiro = terceiros[0]?.participante;
   const terceirosRepescagem = terceiros.slice(1).map((item) => item.participante);
+
+  garantirParticipantesClassificados([melhorTerceiro, ...terceirosRepescagem]);
 
   if (!jogoRepescagem) {
     await prisma.jogo.create({
@@ -457,6 +566,11 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
     const quartas3 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_3");
     const quartas4 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_4");
 
+    garantirJogoFinalizado(quartas1, "QUARTAS_1");
+    garantirJogoFinalizado(quartas2, "QUARTAS_2");
+    garantirJogoFinalizado(quartas3, "QUARTAS_3");
+    garantirJogoFinalizado(quartas4, "QUARTAS_4");
+
     await prisma.jogo.createMany({
       data: [
         {
@@ -487,41 +601,170 @@ async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
     const semifinal1 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_1");
     const semifinal2 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_2");
 
-    const perdedorSemifinal1 = obterPerdedorDoJogo(semifinal1);
-    const perdedorSemifinal2 = obterPerdedorDoJogo(semifinal2);
-
-    const jogosParaCriar = [];
-
-    if (!jogoFinal) {
-      jogosParaCriar.push({
-        fase: "FINAL",
-        campeonatoId: Number(campeonatoId),
-        equipeAId: semifinal1.vencedorId,
-        equipeBId: semifinal2.vencedorId,
-        ordem: 1
-      });
-    }
-
-    if (!jogoTerceiroLugar) {
-      jogosParaCriar.push({
-        fase: "TERCEIRO_LUGAR",
-        campeonatoId: Number(campeonatoId),
-        equipeAId: perdedorSemifinal1.id,
-        equipeBId: perdedorSemifinal2.id,
-        ordem: 1
-      });
-    }
-
-    if (jogosParaCriar.length > 0) {
-      await prisma.jogo.createMany({
-        data: jogosParaCriar
-      });
-    }
+    await criarFinalETerceiroLugar(
+      campeonatoId,
+      semifinal1,
+      semifinal2,
+      jogoFinal,
+      jogoTerceiroLugar
+    );
 
     return await listarJogos(campeonatoId);
   }
 
   return await listarJogos(campeonatoId);
+}
+
+async function gerarProximaFaseGruposRepescagem8(campeonatoId, campeonato) {
+  const jogos = campeonato.jogos;
+
+  const jogosFaseGrupos = jogos.filter((jogo) => jogo.fase === "FASE_GRUPOS");
+  const jogosQuartas = jogos.filter((jogo) => jogo.fase.startsWith("QUARTAS"));
+  const jogosSemifinais = jogos.filter((jogo) => jogo.fase.startsWith("SEMIFINAL"));
+  const jogoFinal = jogos.find((jogo) => jogo.fase === "FINAL");
+  const jogoTerceiroLugar = jogos.find((jogo) => jogo.fase === "TERCEIRO_LUGAR");
+
+  if (!jogosFaseGrupos.length) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosFaseGrupos)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  const classificacao = montarClassificacaoDosGrupos(jogos);
+
+  const primeiroA = obterClassificado(classificacao, "A", 0);
+  const segundoA = obterClassificado(classificacao, "A", 1);
+  const terceiroA = obterClassificado(classificacao, "A", 2);
+  const quartoA = obterClassificado(classificacao, "A", 3);
+
+  const primeiroB = obterClassificado(classificacao, "B", 0);
+  const segundoB = obterClassificado(classificacao, "B", 1);
+  const terceiroB = obterClassificado(classificacao, "B", 2);
+  const quartoB = obterClassificado(classificacao, "B", 3);
+
+  garantirParticipantesClassificados([
+    primeiroA,
+    segundoA,
+    terceiroA,
+    quartoA,
+    primeiroB,
+    segundoB,
+    terceiroB,
+    quartoB
+  ]);
+
+  if (!jogosQuartas.length) {
+    await prisma.jogo.createMany({
+      data: [
+        {
+          fase: "QUARTAS_1",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: primeiroA.id,
+          equipeBId: quartoB.id,
+          ordem: 1
+        },
+        {
+          fase: "QUARTAS_2",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: segundoA.id,
+          equipeBId: terceiroB.id,
+          ordem: 2
+        },
+        {
+          fase: "QUARTAS_3",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: primeiroB.id,
+          equipeBId: quartoA.id,
+          ordem: 3
+        },
+        {
+          fase: "QUARTAS_4",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: segundoB.id,
+          equipeBId: terceiroA.id,
+          ordem: 4
+        }
+      ]
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosQuartas)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!jogosSemifinais.length) {
+    const quartas1 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_1");
+    const quartas2 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_2");
+    const quartas3 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_3");
+    const quartas4 = jogosQuartas.find((jogo) => jogo.fase === "QUARTAS_4");
+
+    garantirJogoFinalizado(quartas1, "QUARTAS_1");
+    garantirJogoFinalizado(quartas2, "QUARTAS_2");
+    garantirJogoFinalizado(quartas3, "QUARTAS_3");
+    garantirJogoFinalizado(quartas4, "QUARTAS_4");
+
+    await prisma.jogo.createMany({
+      data: [
+        {
+          fase: "SEMIFINAL_1",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: quartas1.vencedorId,
+          equipeBId: quartas2.vencedorId,
+          ordem: 1
+        },
+        {
+          fase: "SEMIFINAL_2",
+          campeonatoId: Number(campeonatoId),
+          equipeAId: quartas3.vencedorId,
+          equipeBId: quartas4.vencedorId,
+          ordem: 2
+        }
+      ]
+    });
+
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!faseFoiFinalizada(jogosSemifinais)) {
+    return await listarJogos(campeonatoId);
+  }
+
+  if (!jogoFinal || !jogoTerceiroLugar) {
+    const semifinal1 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_1");
+    const semifinal2 = jogosSemifinais.find((jogo) => jogo.fase === "SEMIFINAL_2");
+
+    await criarFinalETerceiroLugar(
+      campeonatoId,
+      semifinal1,
+      semifinal2,
+      jogoFinal,
+      jogoTerceiroLugar
+    );
+
+    return await listarJogos(campeonatoId);
+  }
+
+  return await listarJogos(campeonatoId);
+}
+
+async function gerarProximaFaseGruposRepescagem(campeonatoId, campeonato) {
+  const quantidadeParticipantes = campeonato.participantes.length;
+
+  if (quantidadeParticipantes === 8) {
+    return await gerarProximaFaseGruposRepescagem8(campeonatoId, campeonato);
+  }
+
+  if (quantidadeParticipantes === 12) {
+    return await gerarProximaFaseGruposRepescagem12(campeonatoId, campeonato);
+  }
+
+  throw new Error(
+    "O formato Fase de grupos + repescagem + mata-mata precisa ter 8 ou 12 participantes aprovados."
+  );
 }
 
 async function encerrarInscricoes(campeonatoId) {
@@ -565,6 +808,8 @@ async function gerarChaveamento(campeonatoId) {
   if (!campeonato) {
     throw new Error("Campeonato não encontrado.");
   }
+
+  validarFormatoDisponivel(campeonato.formato);
 
   if (campeonato.inscricoesAbertas) {
     throw new Error("Feche as inscrições antes de gerar o chaveamento.");
@@ -675,6 +920,8 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
     throw new Error("Campeonato não encontrado.");
   }
 
+  validarFormatoDisponivel(campeonato.formato);
+
   if (campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
     return await gerarProximaFaseGruposRepescagem(campeonatoId, campeonato);
   }
@@ -728,14 +975,18 @@ async function gerarProximaFaseSePossivel(campeonatoId) {
       const semifinal1 = ultimaRodada.jogos.find((jogo) => jogo.fase === "SEMIFINAL_1");
       const semifinal2 = ultimaRodada.jogos.find((jogo) => jogo.fase === "SEMIFINAL_2");
 
+      garantirJogoFinalizado(semifinal1, "SEMIFINAL_1");
+      garantirJogoFinalizado(semifinal2, "SEMIFINAL_2");
+
       const vencedor1 = semifinal1.vencedor;
       const vencedor2 = semifinal2.vencedor;
 
-      const perdedor1 =
-        semifinal1.equipeAId === vencedor1.id ? semifinal1.equipeB : semifinal1.equipeA;
+      const perdedor1 = obterPerdedorDoJogo(semifinal1);
+      const perdedor2 = obterPerdedorDoJogo(semifinal2);
 
-      const perdedor2 =
-        semifinal2.equipeAId === vencedor2.id ? semifinal2.equipeB : semifinal2.equipeA;
+      if (!vencedor1 || !vencedor2 || !perdedor1 || !perdedor2) {
+        throw new Error("Não foi possível montar final e disputa de terceiro lugar.");
+      }
 
       await prisma.jogo.createMany({
         data: [
