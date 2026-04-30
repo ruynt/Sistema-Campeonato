@@ -747,6 +747,16 @@ body {
   background: rgba(32, 54, 103, 0.04);
 }
 
+.campeonatos-action--primary:hover {
+  background: linear-gradient(90deg, var(--brand-orange), var(--brand-red));
+  color: #fff;
+  filter: brightness(0.98);
+}
+
+.campeonatos-action--primary:hover .campeonatos-action-icon {
+  color: #fff;
+}
+
 .campeonatos-action:focus-visible {
   outline: 2px solid rgba(243, 146, 0, 0.7);
   outline-offset: 2px;

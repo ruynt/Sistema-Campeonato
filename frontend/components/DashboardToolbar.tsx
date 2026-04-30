@@ -43,7 +43,8 @@ export default function DashboardToolbar({
       dashboard: "/dashboard",
       campeonatos: "/dashboard/campeonatos",
       minhasInscricoes: "/dashboard/minhas-inscricoes",
-      admin: "/dashboard/admin"
+      admin: "/dashboard/admin",
+      inscricoesAdmin: "/dashboard/inscricoes"
     };
   }, []);
 
@@ -121,9 +122,9 @@ export default function DashboardToolbar({
                   <span className="dash-link-text">Campeonatos</span>
                 </Link>
                 <Link
-                  href={rotas.campeonatos}
+                  href={rotas.inscricoesAdmin}
                   className={`dash-link ${
-                    pathname.startsWith(rotas.campeonatos) ? "is-active" : ""
+                    pathname.startsWith(rotas.inscricoesAdmin) ? "is-active" : ""
                   }`}
                   onClick={onNavegar}
                 >
