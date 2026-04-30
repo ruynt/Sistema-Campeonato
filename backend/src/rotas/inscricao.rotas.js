@@ -42,6 +42,18 @@ router.patch(
   inscricaoIndividualControlador.reprovarInscricao
 );
 
+router.patch(
+  "/inscricoes-individuais/:inscricaoId",
+  autenticarAdmin,
+  inscricaoIndividualControlador.atualizarInscricao
+);
+
+router.delete(
+  "/inscricoes-individuais/:inscricaoId",
+  autenticarAdmin,
+  inscricaoIndividualControlador.excluirInscricao
+);
+
 router.get(
   "/:id/minha-inscricao-individual",
   autenticarParticipante,

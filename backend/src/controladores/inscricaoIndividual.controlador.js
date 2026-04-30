@@ -70,6 +70,39 @@ async function reprovarInscricao(req, res) {
   }
 }
 
+async function atualizarInscricao(req, res) {
+  try {
+    const { inscricaoId } = req.params;
+    const { tamanhoCamisa, valorTotalCentavos, observacaoAdmin } = req.body || {};
+
+    const inscricao = await inscricaoIndividualServico.atualizarInscricao(inscricaoId, {
+      tamanhoCamisa,
+      valorTotalCentavos,
+      observacaoAdmin
+    });
+
+    return res.json(inscricao);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
+async function excluirInscricao(req, res) {
+  try {
+    const { inscricaoId } = req.params;
+
+    const inscricao = await inscricaoIndividualServico.excluirInscricao(inscricaoId);
+
+    return res.json(inscricao);
+  } catch (error) {
+    return res.status(400).json({
+      erro: error.message
+    });
+  }
+}
+
 async function montarEquipe(req, res) {
   try {
     const { id } = req.params;
@@ -119,5 +152,7 @@ export default {
   buscarMinhaInscricao,
   aprovarInscricao,
   reprovarInscricao,
+  atualizarInscricao,
+  excluirInscricao,
   montarEquipe
 };

@@ -379,6 +379,79 @@ async function reprovarInscricao(inscricaoId, observacaoAdmin = null) {
   return inscricaoAtualizada;
 }
 
+async function atualizarInscricao(inscricaoId, dados = {}) {
+  const { tamanhoCamisa, valorTotalCentavos, observacaoAdmin } = dados || {};
+
+  const inscricao = await prisma.inscricaoIndividual.findUnique({
+    where: {
+      id: Number(inscricaoId)
+    },
+    include: {
+      usuario: true,
+      campeonato: true
+    }
+  });
+
+  if (!inscricao) {
+    throw new Error("Inscrição individual não encontrada.");
+  }
+
+  if (inscricao.status === "USADA_EM_EQUIPE") {
+    throw new Error("Esta inscrição já foi usada em uma equipe.");
+  }
+
+  const dataAtualizacao = {};
+
+  if (typeof tamanhoCamisa !== "undefined") {
+    validarTamanhoCamisa(tamanhoCamisa);
+    dataAtualizacao.tamanhoCamisa = tamanhoCamisa;
+  }
+
+  if (typeof valorTotalCentavos !== "undefined") {
+    const valor = Number(valorTotalCentavos);
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new Error("Valor total em centavos inválido.");
+    }
+    dataAtualizacao.valorTotalCentavos = Math.round(valor);
+  }
+
+  if (typeof observacaoAdmin !== "undefined") {
+    const obs = String(observacaoAdmin || "").trim();
+    dataAtualizacao.observacaoAdmin = obs.length ? obs : null;
+  }
+
+  if (!Object.keys(dataAtualizacao).length) {
+    return inscricao;
+  }
+
+  const inscricaoAtualizada = await prisma.inscricaoIndividual.update({
+    where: {
+      id: Number(inscricaoId)
+    },
+    data: dataAtualizacao,
+    include: {
+      usuario: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          contato: true,
+          sexo: true,
+          fotoPerfil: true
+        }
+      },
+      campeonato: true,
+      participante: true
+    }
+  });
+
+  return inscricaoAtualizada;
+}
+
+async function excluirInscricao(inscricaoId) {
+  return await reprovarInscricao(inscricaoId, "Excluída pelo administrador.");
+}
+
 async function montarEquipeComInscricoesIndividuais(campeonatoId, dados) {
   const { nomeEquipe, responsavel, contato, inscricaoIds } = dados;
 
@@ -564,5 +637,7 @@ export default {
   buscarMinhaInscricao,
   aprovarInscricao,
   reprovarInscricao,
+  atualizarInscricao,
+  excluirInscricao,
   montarEquipeComInscricoesIndividuais
 };
