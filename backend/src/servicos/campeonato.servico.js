@@ -16,18 +16,6 @@ function valorFoiEnviado(valor) {
   return valor !== undefined && valor !== null && valor !== "";
 }
 
-function obterTamanhoEquipe(tipoParticipante) {
-  if (tipoParticipante === "DUPLA") {
-    return 2;
-  }
-
-  if (tipoParticipante === "TIME") {
-    return 4;
-  }
-
-  throw new Error("Tipo de participante inválido.");
-}
-
 function validarFormatoCampeonato(formato) {
   if (!formato) {
     return "MATA_MATA";
@@ -52,13 +40,13 @@ function validarModoInscricao(modoInscricao) {
   return modoInscricao;
 }
 
-function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
+function prepararQuantidadeMaxima(formato, modoInscricao, quantidadeMaxima) {
   if (
     quantidadeMaxima === null ||
     quantidadeMaxima === undefined ||
     quantidadeMaxima === ""
   ) {
-    if (formato === "GRUPOS_3X4_REPESCAGEM") {
+    if (formato === "GRUPOS_3X4_REPESCAGEM" && modoInscricao === "POR_EQUIPE") {
       return 12;
     }
 
@@ -71,9 +59,13 @@ function prepararQuantidadeMaxima(formato, quantidadeMaxima) {
     throw new Error("A quantidade máxima precisa ser um número maior ou igual a 2.");
   }
 
-  if (formato === "GRUPOS_3X4_REPESCAGEM" && ![8, 12].includes(quantidade)) {
+  if (
+    formato === "GRUPOS_3X4_REPESCAGEM" &&
+    modoInscricao === "POR_EQUIPE" &&
+    ![8, 12].includes(quantidade)
+  ) {
     throw new Error(
-      "No formato com fase de grupos, a quantidade máxima precisa ser 8 ou 12."
+      "No formato com fase de grupos por equipe, a quantidade máxima precisa ser 8 ou 12 equipes."
     );
   }
 
@@ -105,6 +97,7 @@ async function criar(dados) {
 
   const quantidadeMaximaTratada = prepararQuantidadeMaxima(
     formatoValidado,
+    modoInscricaoValidado,
     quantidadeMaxima
   );
 
@@ -310,32 +303,33 @@ async function atualizar(id, dados) {
   }
 
   const quantidadeMaximaTratada = quantidadeMaxima !== undefined
-    ? prepararQuantidadeMaxima(formatoFinal, quantidadeMaxima)
+    ? prepararQuantidadeMaxima(
+        formatoFinal,
+        modoInscricaoFinal,
+        quantidadeMaxima
+      )
     : campeonato.quantidadeMaxima;
 
   if (
+    modoInscricaoFinal === "POR_EQUIPE" &&
     quantidadeMaximaTratada !== null &&
     quantidadeMaximaTratada !== undefined &&
     quantidadeMaximaTratada < totalEquipesInscritas
   ) {
     throw new Error(
-      `A quantidade máxima não pode ser menor que o total atual de equipes inscritas (${totalEquipesInscritas}).`
+      `A quantidade máxima de equipes não pode ser menor que o total atual de equipes inscritas (${totalEquipesInscritas}).`
     );
   }
 
   if (
     modoInscricaoFinal === "INDIVIDUAL" &&
     quantidadeMaximaTratada !== null &&
-    quantidadeMaximaTratada !== undefined
+    quantidadeMaximaTratada !== undefined &&
+    quantidadeMaximaTratada < totalInscricoesIndividuaisAtivas
   ) {
-    const tamanhoEquipe = obterTamanhoEquipe(tipoParticipanteFinal);
-    const limiteJogadoresIndividuais = quantidadeMaximaTratada * tamanhoEquipe;
-
-    if (totalInscricoesIndividuaisAtivas > limiteJogadoresIndividuais) {
-      throw new Error(
-        `A quantidade máxima informada permite apenas ${limiteJogadoresIndividuais} jogadores individuais, mas já existem ${totalInscricoesIndividuaisAtivas} inscritos.`
-      );
-    }
+    throw new Error(
+      `A quantidade máxima de jogadores não pode ser menor que o total atual de jogadores individuais ativos (${totalInscricoesIndividuaisAtivas}).`
+    );
   }
 
   const campeonatoAtualizado = await prisma.campeonato.update({

@@ -218,6 +218,40 @@ function obterLimiteMembrosPorTipo(tipoParticipante) {
   return 0;
 }
 
+function contarJogadoresIndividuaisAtivos() {
+  return inscricoesIndividuaisAtual.filter(
+    (inscricao) => inscricao.status !== "CANCELADA"
+  ).length;
+}
+
+function obterRotuloQuantidadeMaxima(modoInscricao) {
+  if (modoInscricao === "INDIVIDUAL") {
+    return "Quantidade máxima de jogadores";
+  }
+
+  return "Quantidade máxima de equipes";
+}
+
+function obterTextoAjudaQuantidadeMaxima(campeonato) {
+  if (campeonato.modoInscricao === "INDIVIDUAL") {
+    return "Em campeonatos individuais, este número representa jogadores. Inscrições reprovadas/canceladas não contam.";
+  }
+
+  if (campeonato.formato === "GRUPOS_3X4_REPESCAGEM") {
+    return "No formato com grupos por equipe, use 8 ou 12 equipes.";
+  }
+
+  return "Em campeonatos por equipe, este número representa equipes inscritas.";
+}
+
+function obterMinimoQuantidadeMaxima(resumo) {
+  if (resumo.campeonato.modoInscricao === "INDIVIDUAL") {
+    return Math.max(2, contarJogadoresIndividuaisAtivos());
+  }
+
+  return Math.max(2, resumo.totais.participantes);
+}
+
 function inscricaoIndividualAguardandoAnalise(inscricao) {
   return (
     inscricao.status !== "CANCELADA" &&
@@ -348,7 +382,9 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
     resumo.totais.participantes > 0 ||
     inscricoesIndividuaisAtual.some((inscricao) => inscricao.status !== "CANCELADA");
 
-  const minimoQuantidade = Math.max(1, resumo.totais.participantes);
+  const minimoQuantidade = obterMinimoQuantidadeMaxima(resumo);
+  const rotuloQuantidade = obterRotuloQuantidadeMaxima(campeonato.modoInscricao);
+  const textoAjudaQuantidade = obterTextoAjudaQuantidadeMaxima(campeonato);
 
   return `
     <div class="area-edicao-campeonato">
@@ -416,7 +452,7 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
         </div>
 
         <div class="grupo-formulario">
-          <label>Quantidade máxima</label>
+          <label>${rotuloQuantidade}</label>
           <input
             type="number"
             name="quantidadeMaxima"
@@ -424,7 +460,7 @@ function renderizarFormularioEdicaoCampeonato(resumo) {
             value="${campeonato.quantidadeMaxima ?? ""}"
           />
           <small class="texto-ajuda">
-            No formato com grupos, use 8 ou 12 equipes.
+            ${textoAjudaQuantidade}
           </small>
         </div>
 
@@ -447,10 +483,9 @@ function renderizarResumo(resumo) {
   const classeStatus = classeStatusCampeonato(resumo.statusCampeonato);
   const mensagemChaveamento = mensagemApoioChaveamento(resumo);
   const podeEditarCampeonato = resumo.jogos.length === 0;
+  const rotuloQuantidade = obterRotuloQuantidadeMaxima(campeonato.modoInscricao);
 
-  const jogadoresIndividuaisAtivos = inscricoesIndividuaisAtual.filter(
-    (inscricao) => inscricao.status !== "CANCELADA"
-  ).length;
+  const jogadoresIndividuaisAtivos = contarJogadoresIndividuaisAtivos();
 
   const jogadoresAguardandoAnalise = inscricoesIndividuaisAtual.filter(
     inscricaoIndividualAguardandoAnalise
@@ -469,7 +504,7 @@ function renderizarResumo(resumo) {
       <p><strong>Categoria:</strong> ${campeonato.categoria}</p>
       <p><strong>Formato:</strong> ${traduzirFormato(campeonato.formato)}</p>
       <p><strong>Forma de inscrição:</strong> ${traduzirModoInscricao(campeonato.modoInscricao)}</p>
-      <p><strong>Quantidade máxima:</strong> ${campeonato.quantidadeMaxima ?? "Não definida"}</p>
+      <p><strong>${rotuloQuantidade}:</strong> ${campeonato.quantidadeMaxima ?? "Não definida"}</p>
       <p><strong>Inscrições abertas:</strong> ${campeonato.inscricoesAbertas ? "Sim" : "Não"}</p>
       <p><strong>Total de equipes:</strong> ${resumo.totais.participantes}</p>
       <p><strong>Jogadores individuais ativos:</strong> ${jogadoresIndividuaisAtivos}</p>
@@ -1238,26 +1273,40 @@ function conectarFormularioEdicaoCampeonato() {
         ? resumoAtual.campeonato.modoInscricao
         : form.querySelector('[name="modoInscricao"]').value;
 
-      let quantidadeMaximaValor = form.querySelector('[name="quantidadeMaxima"]').value
+      const quantidadeMaximaValor = form.querySelector('[name="quantidadeMaxima"]').value
         ? Number(form.querySelector('[name="quantidadeMaxima"]').value)
         : null;
 
-      if (formatoSelecionado === "GRUPOS_3X4_REPESCAGEM") {
-        quantidadeMaximaValor = quantidadeMaximaValor || 12;
-
-        if (![8, 12].includes(quantidadeMaximaValor)) {
-          mensagemEdicao.textContent =
-            "Erro: no formato com grupos, a quantidade máxima precisa ser 8 ou 12.";
-          return;
-        }
+      if (
+        modoInscricaoSelecionado === "POR_EQUIPE" &&
+        formatoSelecionado === "GRUPOS_3X4_REPESCAGEM" &&
+        quantidadeMaximaValor !== null &&
+        ![8, 12].includes(quantidadeMaximaValor)
+      ) {
+        mensagemEdicao.textContent =
+          "Erro: no formato com grupos por equipe, a quantidade máxima precisa ser 8 ou 12 equipes.";
+        return;
       }
 
       if (
+        modoInscricaoSelecionado === "POR_EQUIPE" &&
         quantidadeMaximaValor !== null &&
         quantidadeMaximaValor < resumoAtual.totais.participantes
       ) {
         mensagemEdicao.textContent =
-          `Erro: a quantidade máxima não pode ser menor que o total atual de equipes (${resumoAtual.totais.participantes}).`;
+          `Erro: a quantidade máxima de equipes não pode ser menor que o total atual de equipes (${resumoAtual.totais.participantes}).`;
+        return;
+      }
+
+      const totalJogadoresIndividuaisAtivos = contarJogadoresIndividuaisAtivos();
+
+      if (
+        modoInscricaoSelecionado === "INDIVIDUAL" &&
+        quantidadeMaximaValor !== null &&
+        quantidadeMaximaValor < totalJogadoresIndividuaisAtivos
+      ) {
+        mensagemEdicao.textContent =
+          `Erro: a quantidade máxima de jogadores não pode ser menor que o total atual de jogadores individuais ativos (${totalJogadoresIndividuaisAtivos}).`;
         return;
       }
 

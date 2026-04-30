@@ -101,6 +101,17 @@ function validarJogadoresParaEquipe(inscricoes, campeonato) {
   }
 }
 
+async function contarInscricoesIndividuaisAtivas(campeonatoId) {
+  return await prisma.inscricaoIndividual.count({
+    where: {
+      campeonatoId: Number(campeonatoId),
+      status: {
+        not: "CANCELADA"
+      }
+    }
+  });
+}
+
 async function criar(campeonatoId, usuarioId, dados = {}) {
   const { tamanhoCamisa, comprovantePagamento } = dados;
 
@@ -157,22 +168,13 @@ async function criar(campeonatoId, usuarioId, dados = {}) {
     throw new Error("Você já enviou uma inscrição individual para este campeonato.");
   }
 
-  const quantidadePorEquipe = obterLimiteMembrosPorTipo(campeonato.tipoParticipante);
-
   if (campeonato.quantidadeMaxima !== null) {
-    const limitePessoas = campeonato.quantidadeMaxima * quantidadePorEquipe;
+    const totalInscricoesAtivas = await contarInscricoesIndividuaisAtivas(
+      campeonatoId
+    );
 
-    const totalInscricoesAtivas = await prisma.inscricaoIndividual.count({
-      where: {
-        campeonatoId: Number(campeonatoId),
-        status: {
-          not: "CANCELADA"
-        }
-      }
-    });
-
-    if (totalInscricoesAtivas >= limitePessoas) {
-      throw new Error("O limite máximo de inscrições individuais já foi atingido.");
+    if (totalInscricoesAtivas >= campeonato.quantidadeMaxima) {
+      throw new Error("O limite máximo de jogadores individuais já foi atingido.");
     }
   }
 
@@ -427,11 +429,16 @@ async function montarEquipeComInscricoesIndividuais(campeonatoId, dados) {
     throw new Error("Já existe uma equipe com esse nome neste campeonato.");
   }
 
-  if (
-    campeonato.quantidadeMaxima !== null &&
-    campeonato.participantes.length >= campeonato.quantidadeMaxima
-  ) {
-    throw new Error("O limite máximo de equipes já foi atingido.");
+  if (campeonato.quantidadeMaxima !== null) {
+    const limiteEquipesPossiveis = Math.floor(
+      campeonato.quantidadeMaxima / limiteMembros
+    );
+
+    if (campeonato.participantes.length >= limiteEquipesPossiveis) {
+      throw new Error(
+        "O limite máximo de equipes possíveis com a quantidade de jogadores individuais já foi atingido."
+      );
+    }
   }
 
   const idsTratados = inscricaoIds.map((id) => Number(id));
