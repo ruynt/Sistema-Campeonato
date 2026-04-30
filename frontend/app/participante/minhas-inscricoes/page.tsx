@@ -250,10 +250,6 @@ export default function MinhasInscricoesPage() {
               <p className="minhas-inscricoes-empty-text">
                 Quando você se inscrever em um campeonato, ela aparecerá aqui.
               </p>
-              <Link className="minhas-inscricoes-cta" href={hrefListaCampeonatos}>
-                <Trophy aria-hidden className="minhas-inscricoes-cta-icon" />
-                Ver campeonatos
-              </Link>
             </div>
           </div>
         ) : null}
@@ -415,15 +411,6 @@ export default function MinhasInscricoesPage() {
                     </dl>
                   </div>
 
-                  <div className="minhas-inscricoes-card-footer">
-                    <Link
-                      className="minhas-inscricoes-cta"
-                      href={hrefListaCampeonatos}
-                    >
-                      <ExternalLink aria-hidden className="minhas-inscricoes-cta-icon" />
-                      Ver campeonatos
-                    </Link>
-                  </div>
                 </article>
               );
             })}
