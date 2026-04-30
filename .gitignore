@@ -3,6 +3,7 @@ node_modules/
 
 .env
 backend/.env
+frontend/.env*
 
 # Next.js
 .next/
@@ -20,3 +21,6 @@ build/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Prisma engines / cache (Windows)
+backend/node_modules/.cache/
