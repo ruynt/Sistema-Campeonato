@@ -223,18 +223,55 @@ async function loginUsuario({ email, senha }) {
 }
 
 async function listarMinhasInscricoes(usuarioId) {
-  return prisma.participante.findMany({
-    where: {
-      usuarioId: Number(usuarioId)
-    },
-    include: {
-      jogadores: true,
-      campeonato: true
-    },
-    orderBy: {
-      criadoEm: "desc"
-    }
-  });
+  const id = Number(usuarioId);
+
+  const [participantesEquipe, inscricoesIndividuais] = await Promise.all([
+    prisma.participante.findMany({
+      where: {
+        usuarioId: id
+      },
+      include: {
+        jogadores: true,
+        campeonato: true
+      },
+      orderBy: {
+        criadoEm: "desc"
+      }
+    }),
+    prisma.inscricaoIndividual.findMany({
+      where: {
+        usuarioId: id
+      },
+      include: {
+        campeonato: true,
+        usuario: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            contato: true,
+            sexo: true,
+            fotoPerfil: true
+          }
+        }
+      },
+      orderBy: {
+        criadoEm: "desc"
+      }
+    })
+  ]);
+
+  const individuaisNormalizadas = inscricoesIndividuais.map((inscricao) => ({
+    ...inscricao,
+    tipo: "INDIVIDUAL"
+  }));
+
+  const combinadas = [...participantesEquipe, ...individuaisNormalizadas];
+  combinadas.sort(
+    (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()
+  );
+
+  return combinadas;
 }
 
 async function buscarPerfil(usuarioId) {
